@@ -96,6 +96,18 @@ async def get_approved_article() -> dict | None:
         return dict(row) if row else None
 
 
+async def get_latest_pending_article() -> dict | None:
+    """Последняя статья на модерации (для дедлайн-автопубликации)."""
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM articles WHERE status IN ('pending', 'approved') "
+            "ORDER BY id DESC LIMIT 1"
+        )
+        row = await cur.fetchone()
+        return dict(row) if row else None
+
+
 # ---------- comments ----------
 async def add_comment(chat_id: int, message_id: int, user_id: int,
                       username: str, text: str) -> bool:
@@ -141,5 +153,25 @@ async def log_ai(kind: str, model: str, input_tokens: int = 0,
             "INSERT INTO ai_logs (kind, model, input_tokens, output_tokens, images, est_cost_usd) "
             "VALUES (?, ?, ?, ?, ?, ?)",
             (kind, model, input_tokens, output_tokens, images, est_cost_usd),
+        )
+        await db.commit()
+
+
+# ---------- settings (редактируемые правила и т.п.) ----------
+async def get_setting(key: str, default: str | None = None) -> str | None:
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        cur = await db.execute("SELECT value FROM settings WHERE key = ?", (key,))
+        row = await cur.fetchone()
+        return row[0] if row else default
+
+
+async def set_setting(key: str, value: str):
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO settings (key, value, updated_at) "
+            "VALUES (?, ?, datetime('now')) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value, "
+            "updated_at = datetime('now')",
+            (key, value),
         )
         await db.commit()

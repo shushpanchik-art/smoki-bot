@@ -50,3 +50,9 @@ CATEGORIES = [
     "history",      # исторические личности
     "nonnicotine",  # безникотиновые альтернативы
 ]
+
+# --- Окна генерации/публикации ---
+GEN_WINDOW_START = _int("GEN_WINDOW_START", 6)
+GEN_WINDOW_END = _int("GEN_WINDOW_END", 7)
+PUBLISH_WINDOW_START = _int("PUBLISH_WINDOW_START", 11)
+PUBLISH_WINDOW_END = _int("PUBLISH_WINDOW_END", 13)

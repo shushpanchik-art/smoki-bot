@@ -27,7 +27,8 @@ CENSOR_RULES = (
 )
 
 
-def article_prompt(topic: str, used_topics: list[str] | None = None) -> str:
+def article_prompt(topic: str, used_topics: list[str] | None = None,
+                   extra_rules: str | None = None) -> str:
     used = ""
     if used_topics:
         joined = "; ".join(used_topics[-50:])
@@ -35,6 +36,7 @@ def article_prompt(topic: str, used_topics: list[str] | None = None) -> str:
             "\n\nУЖЕ ОПУБЛИКОВАННЫЕ ТЕМЫ (не повторяй их и близкие по смыслу):\n"
             f"{joined}"
         )
+    extra = f"\n\nДОПОЛНИТЕЛЬНЫЕ ПРАВИЛА РЕДАКЦИИ:\n{extra_rules}" if extra_rules else ""
     return (
         f"{ARTICLE_SYSTEM}\n\n"
         f"Напиши статью на тему: «{topic}».\n"
@@ -44,7 +46,8 @@ def article_prompt(topic: str, used_topics: list[str] | None = None) -> str:
         "переносы строк). НЕ используй Markdown, НЕ используй теги <h1>-<h6>, "
         "<ul>, <li> — только <b>, <i>, <u>, <a>, эмодзи и переносы строк.\n"
         f"{CENSOR_RULES}"
-        f"{used}\n\n"
+        f"{used}"
+        f"{extra}\n\n"
         "Верни ТОЛЬКО текст статьи, без пояснений и без служебных пометок."
     )
 

@@ -1,0 +1,14 @@
+[run]
+source = .
+omit =
+    venv/*
+    tests/*
+    */__pycache__/*
+    bot.py
+    scheduler.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    raise NotImplementedError

@@ -46,3 +46,10 @@ CREATE TABLE IF NOT EXISTS ai_logs (
   est_cost_usd REAL,
   created_at TEXT DEFAULT (datetime('now'))
 );
+
+
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT,
+  updated_at TEXT DEFAULT (datetime('now'))
+);

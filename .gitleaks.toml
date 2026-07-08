@@ -1,0 +1,17 @@
+title = "SMOKI gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Ignore local venv, data, placeholders and env example"
+paths = [
+  '''venv/''',
+  '''data/''',
+  '''\.env\.example''',
+]
+regexes = [
+  '''your[-_]?token[-_]?here''',
+  '''change[-_]?me''',
+  '''GEMINI_API_KEY=$''',
+]

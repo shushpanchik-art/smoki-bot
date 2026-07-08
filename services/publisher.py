@@ -46,17 +46,17 @@ async def publish_article(bot: Bot, article_id: int) -> dict:
     first_msg_id = None
 
     try:
-        has_image = image_path and Path(image_path).exists()
+        has_image = bool(image_path) and Path(str(image_path)).exists()
         if has_image and len(body) <= TG_CAPTION_LIMIT:
             # фото + весь текст в подписи
             msg = await bot.send_photo(
-                chat, FSInputFile(image_path),
+                chat, FSInputFile(str(image_path)),
                 caption=body, parse_mode="HTML",
             )
             first_msg_id = msg.message_id
         elif has_image:
             # фото отдельно, затем текст частями
-            msg = await bot.send_photo(chat, FSInputFile(image_path))
+            msg = await bot.send_photo(chat, FSInputFile(str(image_path)))
             first_msg_id = msg.message_id
             for part in _split(body, TG_TEXT_LIMIT):
                 await bot.send_message(chat, part, parse_mode="HTML")

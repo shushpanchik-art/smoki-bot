@@ -7,7 +7,7 @@ load_dotenv()
 def _int(name: str, default: int) -> int:
     val = os.getenv(name)
     try:
-        return int(val) if val not in (None, "") else default
+        return int(val) if val else default
     except ValueError:
         return default
 

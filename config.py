@@ -23,6 +23,12 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_TEXT_MODEL = os.getenv("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
 GEMINI_IMAGE_MODEL = os.getenv("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
 
+# --- Vertex AI (аутентификация через service account, без API-ключа) ---
+GOOGLE_GENAI_USE_VERTEXAI = os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "false")
+GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT", "")
+GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+
+
 # --- Хранилище ---
 DB_PATH = os.getenv("DB_PATH", "/opt/SMOKI/bot/smoki.db")
 IMAGE_DIR = os.getenv("IMAGE_DIR", "/opt/SMOKI/bot/images")

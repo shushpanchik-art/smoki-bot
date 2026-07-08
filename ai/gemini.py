@@ -49,6 +49,9 @@ def generate_image(prompt: str) -> bytes | None:
         model=config.GEMINI_IMAGE_MODEL,
         contents=prompt,
     )
+    if not resp.candidates:
+        logger.warning("generate_image: пустой candidates (возможно safety-блок)")
+        return None
     for part in resp.candidates[0].content.parts:
         inline = getattr(part, "inline_data", None)
         if inline and inline.data:

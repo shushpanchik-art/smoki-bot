@@ -20,7 +20,22 @@ def _is_admin_id(uid: int) -> bool:
 
 
 def _is_admin(message: Message) -> bool:
-    return _is_admin_id(message.from_user.id)
+    return message.from_user is not None and _is_admin_id(message.from_user.id)
+
+
+def _cb_arg(cq: CallbackQuery) -> int:
+    """Извлечь int-аргумент после ':' из callback_data (с guard)."""
+    return int((cq.data or "").split(":")[1])
+
+
+async def _clear_markup(cq: CallbackQuery) -> None:
+    """Убрать клавиатуру у сообщения callback (с guard на None/Inaccessible)."""
+    msg = cq.message
+    if msg is not None and hasattr(msg, "edit_reply_markup"):
+        try:
+            await msg.edit_reply_markup(reply_markup=None)
+        except Exception:
+            logger.debug("edit_reply_markup failed", exc_info=True)
 
 
 def _kb(article_id: int) -> InlineKeyboardMarkup:
@@ -46,14 +61,14 @@ async def send_for_moderation(bot: Bot, article_id: int):
     kb = _kb(article_id)
 
     from pathlib import Path
-    has_img = image_path and Path(image_path).exists()
+    has_img = bool(image_path) and Path(str(image_path)).exists()
     full = header + body
     if has_img and len(full) <= CAPTION_LIMIT:
-        await bot.send_photo(config.ADMIN_CHAT_ID, FSInputFile(image_path),
+        await bot.send_photo(config.ADMIN_CHAT_ID, FSInputFile(str(image_path)),
                              caption=full, reply_markup=kb)
     else:
         if has_img:
-            await bot.send_photo(config.ADMIN_CHAT_ID, FSInputFile(image_path))
+            await bot.send_photo(config.ADMIN_CHAT_ID, FSInputFile(str(image_path)))
         # текст: если длинный — режем, кнопки на последнем куске
         parts = publisher._split(body, 4000)
         for i, part in enumerate(parts):
@@ -69,7 +84,7 @@ async def cmd_id(message: Message):
     await message.answer(
         f"chat_id этого чата: <code>{message.chat.id}</code>\n"
         f"тип чата: {message.chat.type}\n"
-        f"твой user_id: <code>{message.from_user.id}</code>"
+        f"твой user_id: <code>{message.from_user.id if message.from_user else '?'}</code>"
     )
 
 
@@ -80,7 +95,7 @@ async def cmd_start(message: Message):
     if not _is_admin(message):
         await message.answer(
             "Это служебный бот автоведения канала SMOKI.\n"
-            f"Твой user_id: <code>{message.from_user.id}</code>\n"
+            f"Твой user_id: <code>{message.from_user.id if message.from_user else '?'}</code>\n"
             "Если ты администратор — впиши этот id в ADMIN_CHAT_ID (.env)."
         )
         return
@@ -115,11 +130,11 @@ async def cb_publish(cq: CallbackQuery, bot: Bot):
     if not _is_admin_id(cq.from_user.id):
         await cq.answer("Не для тебя", show_alert=True)
         return
-    aid = int(cq.data.split(":")[1])
+    aid = _cb_arg(cq)
     await cq.answer("Публикую…")
     res = await publisher.publish_article(bot, aid)
     if res["ok"]:
-        await cq.message.edit_reply_markup(reply_markup=None)
+        await _clear_markup(cq)
         await bot.send_message(config.ADMIN_CHAT_ID,
                                f"✅ Статья #{aid} опубликована (msg {res['message_id']}).")
     else:
@@ -132,7 +147,7 @@ async def cb_regen(cq: CallbackQuery, bot: Bot):
     if not _is_admin_id(cq.from_user.id):
         await cq.answer("Не для тебя", show_alert=True)
         return
-    aid = int(cq.data.split(":")[1])
+    aid = _cb_arg(cq)
     old = await db.get_article(aid)
     regen = (old.get("regen_count") or 0) if old else 0
     if regen >= config.MAX_REGEN:
@@ -151,7 +166,7 @@ async def cb_regen(cq: CallbackQuery, bot: Bot):
     # перенос счётчика
     await db.update_article(res["article_id"], regen_count=regen + 1)
     await db.update_article(aid, status="rejected")
-    await cq.message.edit_reply_markup(reply_markup=None)
+    await _clear_markup(cq)
     await send_for_moderation(bot, res["article_id"])
 
 
@@ -160,7 +175,7 @@ async def cb_reject(cq: CallbackQuery):
     if not _is_admin_id(cq.from_user.id):
         await cq.answer("Не для тебя", show_alert=True)
         return
-    aid = int(cq.data.split(":")[1])
+    aid = _cb_arg(cq)
     await db.update_article(aid, status="rejected")
     await cq.answer("Отклонено")
-    await cq.message.edit_reply_markup(reply_markup=None)
+    await _clear_markup(cq)

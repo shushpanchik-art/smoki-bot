@@ -39,7 +39,7 @@ async def add_topic(title: str, category: str, status: str = "draft") -> int:
         )
         await db.commit()
         if cur.lastrowid:
-            return cur.lastrowid
+            return int(cur.lastrowid)
         cur = await db.execute(
             "SELECT id FROM published_topics WHERE topic_hash = ?", (h,)
         )
@@ -56,8 +56,8 @@ async def set_topic_status(topic_id: int, status: str):
 
 
 # ---------- articles ----------
-async def add_article(topic_id: int, body: str, image_path: str = None,
-                      image_prompt: str = None) -> int:
+async def add_article(topic_id: int, body: str, image_path: str | None = None,
+                      image_prompt: str | None = None) -> int:
     async with aiosqlite.connect(config.DB_PATH) as db:
         cur = await db.execute(
             "INSERT INTO articles (topic_id, body, image_path, image_prompt) "
@@ -65,7 +65,7 @@ async def add_article(topic_id: int, body: str, image_path: str = None,
             (topic_id, body, image_path, image_prompt),
         )
         await db.commit()
-        return cur.lastrowid
+        return int(cur.lastrowid or 0)
 
 
 async def get_article(article_id: int) -> dict | None:

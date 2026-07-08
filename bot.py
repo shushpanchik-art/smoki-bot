@@ -8,6 +8,7 @@ from aiogram.enums import ParseMode
 import config
 from db import database
 from handlers import ROUTERS
+import scheduler
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,6 +35,8 @@ async def main():
     me = await bot.get_me()
     logger.info("Бот запущен: @%s (id=%s)", me.username, me.id)
 
+    scheduler.start(bot)
+    logger.info("Планировщик активирован")
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 

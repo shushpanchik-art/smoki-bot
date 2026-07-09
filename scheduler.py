@@ -3,10 +3,11 @@ import random
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 import config
 from db import database
-from services import content, publisher
+from services import comments, content, publisher
 
 logger = logging.getLogger("smoki.scheduler")
 
@@ -61,6 +62,16 @@ async def _job_deadline(bot):
         logger.exception("Ошибка в дедлайн-джобе")
 
 
+async def _job_comments(bot):
+    """Модерация новых комментариев в группе-обсуждении."""
+    logger.info("Планировщик: обработка комментариев")
+    try:
+        stats = await comments.process_new_comments(bot)
+        logger.info("Комментарии обработаны: %s", stats)
+    except Exception:
+        logger.exception("Ошибка в джобе модерации комментариев")
+
+
 def _random_minute() -> int:
     return random.randint(0, 59)
 
@@ -93,6 +104,17 @@ def start(bot) -> AsyncIOScheduler:
         replace_existing=True,
     )
     logger.info("Джоб дедлайна публикации: %02d:00", config.PUBLISH_WINDOW_END)
+
+    # Модерация комментариев: интервал COMMENTS_INTERVAL_HOURS
+    sched.add_job(
+        _job_comments,
+        IntervalTrigger(hours=config.COMMENTS_INTERVAL_HOURS),
+        args=[bot],
+        id="process_comments",
+        replace_existing=True,
+    )
+    logger.info("Джоб модерации комментариев: каждые %d ч",
+                config.COMMENTS_INTERVAL_HOURS)
 
     sched.start()
     _scheduler = sched

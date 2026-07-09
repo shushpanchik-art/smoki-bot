@@ -12,3 +12,4 @@ images/
 htmlcov/
 .pytest_cache/
 .mypy_cache/
+media/

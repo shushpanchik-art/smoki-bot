@@ -175,3 +175,15 @@ async def set_setting(key: str, value: str):
             (key, value),
         )
         await db.commit()
+
+
+async def append_setting(key: str, text: str, sep: str = "\n- ", limit: int = 4000):
+    """Накопительно дописать строку в settings[key] (для фидбэка/цензуры)."""
+    text = (text or "").strip()
+    if not text:
+        return
+    old = await get_setting(key, "") or ""
+    combined = (old + sep + text) if old else text
+    if len(combined) > limit:
+        combined = combined[-limit:]
+    await set_setting(key, combined)

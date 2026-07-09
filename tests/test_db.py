@@ -48,3 +48,73 @@ async def test_add_topic_duplicate_returns_same_id(tmp_db):
     tid1 = await db.add_topic("Дубликат", "news")
     tid2 = await db.add_topic("дубликат", "curious")  # тот же hash
     assert tid1 == tid2
+
+
+async def test_add_and_get_article(tmp_db):
+    await db.init_db()
+    tid = await db.add_topic("Статья тема", "news")
+    aid = await db.add_article(tid, "тело статьи", image_path="/img/a.jpg",
+                               image_prompt="prompt text")
+    assert aid > 0
+    art = await db.get_article(aid)
+    assert art is not None
+    assert art["topic_id"] == tid
+    assert art["body"] == "тело статьи"
+    assert art["image_path"] == "/img/a.jpg"
+    assert art["image_prompt"] == "prompt text"
+
+
+async def test_add_article_minimal(tmp_db):
+    await db.init_db()
+    tid = await db.add_topic("Мин статья", "news")
+    aid = await db.add_article(tid, "только тело")
+    art = await db.get_article(aid)
+    assert art is not None
+    assert art["body"] == "только тело"
+    assert art["image_path"] is None
+    assert art["image_prompt"] is None
+
+
+async def test_get_article_not_found(tmp_db):
+    await db.init_db()
+    assert await db.get_article(999999) is None
+
+
+async def test_update_article_fields(tmp_db):
+    await db.init_db()
+    tid = await db.add_topic("Апдейт тема", "news")
+    aid = await db.add_article(tid, "старое тело")
+    await db.update_article(aid, body="новое тело", status="approved")
+    art = await db.get_article(aid)
+    assert art is not None
+    assert art["body"] == "новое тело"
+    assert art["status"] == "approved"
+
+
+async def test_update_article_empty_noop(tmp_db):
+    await db.init_db()
+    tid = await db.add_topic("Ноуп тема", "news")
+    aid = await db.add_article(tid, "тело")
+    await db.update_article(aid)  # без полей — не должно падать
+    art = await db.get_article(aid)
+    assert art is not None
+    assert art["body"] == "тело"
+
+
+async def test_set_and_get_setting(tmp_db):
+    await db.init_db()
+    await db.set_setting("mykey", "value1")
+    assert await db.get_setting("mykey") == "value1"
+
+
+async def test_set_setting_upsert(tmp_db):
+    await db.init_db()
+    await db.set_setting("k", "first")
+    await db.set_setting("k", "second")  # ON CONFLICT -> обновляет
+    assert await db.get_setting("k") == "second"
+
+
+async def test_get_setting_default(tmp_db):
+    await db.init_db()
+    assert await db.get_setting("absent") is None
+    assert await db.get_setting("absent", "def") == "def"

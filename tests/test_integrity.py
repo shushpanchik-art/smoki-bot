@@ -1,7 +1,6 @@
 """Целостность данных: UNIQUE-констрейнты и дедупликация."""
 import asyncio
 
-import pytest
 
 
 def _init(tmp_db):

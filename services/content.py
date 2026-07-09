@@ -82,6 +82,20 @@ def _clean_html(text: str) -> str:
     return text.strip()
 
 
+async def _accumulated_rules(extra: str | None = None) -> str | None:
+    """Склеить накопленный опыт (лайки/цензура) с разовым фидбэком."""
+    parts: list[str] = []
+    liked = await db.get_setting("liked_feedback")
+    if liked:
+        parts.append("Что нравится админу (следуй этому стилю):\n" + liked)
+    censor = await db.get_setting("censor_extra")
+    if censor:
+        parts.append("Чего избегать (замечания админа):\n" + censor)
+    if extra:
+        parts.append("Разовые правки к этой статье:\n" + extra)
+    return "\n\n".join(parts) if parts else None
+
+
 async def generate_article(topic: str | None = None,
                            extra_rules: str | None = None,
                            make_image: bool = True) -> dict:
@@ -94,7 +108,8 @@ async def generate_article(topic: str | None = None,
     logger.info("Генерация статьи по теме: %s", topic)
 
     used = await db.get_used_topics()
-    body_raw = await _text(prompts.article_prompt(topic, used, extra_rules))
+    rules = await _accumulated_rules(extra_rules)
+    body_raw = await _text(prompts.article_prompt(topic, used, rules))
     body = _clean_html(body_raw)
 
     ok, result = await censor(body)

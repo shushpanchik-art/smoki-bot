@@ -2,7 +2,6 @@
 import asyncio
 import sqlite3
 
-import pytest
 
 _EXPECTED = {
     "published_topics": {"id", "title", "topic_hash", "category", "status", "created_at"},

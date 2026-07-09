@@ -143,6 +143,40 @@ async def cmd_generate(message: Message, bot: Bot):
 
 
 # ---------- модерация: кнопка → спросить фидбэк (FSM) ----------
+@router.message(Command("setlen"))
+async def cmd_setlen(message: Message):
+    """Настройка длины: /setlen morning 2  |  /setlen evening 400"""
+    if not _is_admin(message):
+        return
+    parts = (message.text or "").split()
+    cur_m = await db.get_setting("morning_facts", str(config.MORNING_LEN_DEFAULT))
+    cur_e = await db.get_setting("evening_words", str(config.EVENING_WORDS_DEFAULT))
+    if len(parts) != 3 or parts[1] not in ("morning", "evening"):
+        await message.answer(
+            "Текущие настройки:\n"
+            f"• утро (фактов): <b>{cur_m}</b>\n"
+            f"• вечер (слов): <b>{cur_e}</b>\n\n"
+            "Изменить:\n"
+            "<code>/setlen morning 2</code> (1-3)\n"
+            "<code>/setlen evening 400</code> (200-500)",
+            parse_mode="HTML",
+        )
+        return
+    try:
+        val = int(parts[2])
+    except ValueError:
+        await message.answer("Число не распознано.")
+        return
+    if parts[1] == "morning":
+        val = max(1, min(3, val))
+        await db.set_setting("morning_facts", str(val))
+        await message.answer(f"✅ Утро: {val} факта(ов).")
+    else:
+        val = max(200, min(500, val))
+        await db.set_setting("evening_words", str(val))
+        await message.answer(f"✅ Вечер: {val} слов.")
+
+
 @router.callback_query(F.data.startswith("pub:"))
 async def cb_publish(cq: CallbackQuery, state: FSMContext):
     if not _is_admin_id(cq.from_user.id):

@@ -7,6 +7,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 import config
 from db import database
+from ai import prompts
 from services import comments, content, publisher
 
 logger = logging.getLogger("smoki.scheduler")
@@ -14,12 +15,11 @@ logger = logging.getLogger("smoki.scheduler")
 _scheduler: AsyncIOScheduler | None = None
 
 
-async def _job_generate(bot):
-    """Утренняя генерация черновика → отправка админу на модерацию."""
+async def _generate_and_moderate(bot, extra_rules: str, label: str):
     from handlers import admin
-    logger.info("Планировщик: старт генерации статьи")
+    logger.info("Планировщик: старт генерации (%s)", label)
     try:
-        res = await content.generate_article()
+        res = await content.generate_article(extra_rules=extra_rules)
         if not res.get("ok"):
             logger.warning("Генерация не удалась: %s", res.get("reason"))
             try:
@@ -34,6 +34,20 @@ async def _job_generate(bot):
         logger.info("Статья #%s отправлена на модерацию", res["article_id"])
     except Exception:
         logger.exception("Ошибка в плановой генерации")
+
+
+async def _job_morning(bot):
+    """Утро: 1-3 факта + остроумный коммент → модерация."""
+    n = int(await database.get_setting("morning_facts",
+                                       str(config.MORNING_LEN_DEFAULT)) or config.MORNING_LEN_DEFAULT)
+    await _generate_and_moderate(bot, prompts.facts_rules(n), "утро")
+
+
+async def _job_evening(bot):
+    """Вечер: лонг-рид заданной длины → модерация."""
+    w = int(await database.get_setting("evening_words",
+                                       str(config.EVENING_WORDS_DEFAULT)) or config.EVENING_WORDS_DEFAULT)
+    await _generate_and_moderate(bot, prompts.words_rule(w), "вечер")
 
 
 async def _job_deadline(bot):
@@ -84,16 +98,23 @@ def start(bot) -> AsyncIOScheduler:
 
     sched = AsyncIOScheduler(timezone="Europe/Moscow")
 
-    # Генерация: случайная минута в начальный час окна генерации
-    gen_min = _random_minute()
+    # Утренний пост (факты): случайная минута в начале утреннего окна
+    m_min = _random_minute()
     sched.add_job(
-        _job_generate,
-        CronTrigger(hour=config.GEN_WINDOW_START, minute=gen_min),
-        args=[bot],
-        id="daily_generate",
-        replace_existing=True,
+        _job_morning,
+        CronTrigger(hour=config.MORNING_START, minute=m_min),
+        args=[bot], id="daily_morning", replace_existing=True,
     )
-    logger.info("Джоб генерации: %02d:%02d", config.GEN_WINDOW_START, gen_min)
+    logger.info("Джоб утро: %02d:%02d", config.MORNING_START, m_min)
+
+    # Вечерний пост (лонг-рид)
+    e_min = _random_minute()
+    sched.add_job(
+        _job_evening,
+        CronTrigger(hour=config.EVENING_START, minute=e_min),
+        args=[bot], id="daily_evening", replace_existing=True,
+    )
+    logger.info("Джоб вечер: %02d:%02d", config.EVENING_START, e_min)
 
     # Дедлайн-автопубликация: конец окна публикации (последняя минута)
     sched.add_job(

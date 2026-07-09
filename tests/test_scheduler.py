@@ -13,12 +13,13 @@ def test_random_minute_in_range():
         assert 0 <= scheduler._random_minute() <= 59
 
 
-def test_start_registers_two_jobs(monkeypatch):
+def test_start_registers_jobs(monkeypatch):
     _reset()
     monkeypatch.setattr(scheduler.AsyncIOScheduler, "start", lambda self: None)
     sched = scheduler.start(MagicMock())
     ids = {j.id for j in sched.get_jobs()}
-    assert "daily_generate" in ids
+    assert "daily_morning" in ids
+    assert "daily_evening" in ids
     assert "publish_deadline" in ids
     _reset()
 

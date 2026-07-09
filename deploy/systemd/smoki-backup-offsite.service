@@ -1,0 +1,20 @@
+[Unit]
+Description=SMOKI offsite backup to Yandex.Disk (native API via rclone)
+Documentation=file:/opt/SMOKI/bot/scripts/backup_offsite.sh
+After=network-online.target smoki-backup.service
+Wants=network-online.target
+OnFailure=smoki-backup-offsite-alert.service
+
+[Service]
+Type=oneshot
+Environment=BOT_DIR=/opt/SMOKI/bot
+ExecStart=/opt/SMOKI/bot/scripts/backup_offsite.sh
+StandardOutput=append:/opt/SMOKI/bot/logs/backup-offsite.log
+StandardError=append:/opt/SMOKI/bot/logs/backup-offsite.log
+TimeoutStartSec=30min
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+[Install]
+WantedBy=multi-user.target

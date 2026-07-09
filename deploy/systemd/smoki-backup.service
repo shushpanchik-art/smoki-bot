@@ -1,0 +1,11 @@
+[Unit]
+Description=SMOKI SQLite local backup
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/SMOKI/bot
+ExecStart=/opt/SMOKI/bot/backup.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

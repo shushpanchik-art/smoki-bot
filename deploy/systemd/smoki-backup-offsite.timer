@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily SMOKI offsite backup at 04:50 MSK
+
+[Timer]
+OnCalendar=*-*-* 04:50:00
+Persistent=true
+RandomizedDelaySec=2min
+Unit=smoki-backup-offsite.service
+
+[Install]
+WantedBy=timers.target

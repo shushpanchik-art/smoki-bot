@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 from aiogram import Router, F, Bot
 from aiogram.filters import Command
@@ -80,21 +81,37 @@ async def send_for_moderation(bot: Bot, article_id: int):
     header = f"📝 <b>Черновик #{article_id}</b>\n\n"
     kb = _kb(article_id)
 
-    from pathlib import Path
     has_img = bool(image_path) and Path(str(image_path)).exists()
     full = header + body
-    if has_img and len(full) <= CAPTION_LIMIT:
-        await bot.send_photo(config.ADMIN_CHAT_ID, FSInputFile(str(image_path)),
-                             caption=full, reply_markup=kb)
-    else:
-        if has_img:
-            await bot.send_photo(config.ADMIN_CHAT_ID, FSInputFile(str(image_path)))
+
+    async def _send_text_with_kb():
         parts = publisher._split(body, 4000)
         for i, part in enumerate(parts):
             prefix = header if i == 0 else ""
             last = i == len(parts) - 1
-            await bot.send_message(config.ADMIN_CHAT_ID, prefix + part,
-                                   reply_markup=kb if last else None)
+            await bot.send_message(
+                config.ADMIN_CHAT_ID, prefix + part,
+                reply_markup=kb if last else None,
+            )
+
+    if has_img and len(full) <= CAPTION_LIMIT:
+        try:
+            await bot.send_photo(
+                config.ADMIN_CHAT_ID, FSInputFile(str(image_path)),
+                caption=full, reply_markup=kb,
+            )
+        except Exception:
+            logger.exception("send_for_moderation: фото+caption #%s", article_id)
+            await bot.send_message(config.ADMIN_CHAT_ID, full, reply_markup=kb)
+    else:
+        if has_img:
+            try:
+                await bot.send_photo(
+                    config.ADMIN_CHAT_ID, FSInputFile(str(image_path)),
+                )
+            except Exception:
+                logger.exception("send_for_moderation: фото #%s", article_id)
+        await _send_text_with_kb()
 
 
 # ---------- команды ----------

@@ -1,0 +1,8 @@
+[Unit]
+Description=SMOKI full-project offsite backup failure alert
+Documentation=file:/opt/SMOKI/bot/scripts/notify_admin.sh
+
+[Service]
+Type=oneshot
+Environment=BOT_DIR=/opt/SMOKI/bot
+ExecStart=/opt/SMOKI/bot/scripts/notify_admin.sh offsite-full-failed

@@ -24,15 +24,15 @@
 
 ## Контент-план (Europe/Moscow)
 
-- **Утро (MORNING_START–MORNING_END, деф. 8–10):** 1–3 любопытных факта +
+- **Утро** (MORNING_START–MORNING_END, деф. 8–10): 1–3 любопытных факта +
   остроумный авторский комментарий, до ~120 слов, + картинка.
-- **Вечер (EVENING_START–EVENING_END, деф. 19–20):** лонг-рид 200–500 слов
+- **Вечер** (EVENING_START–EVENING_END, деф. 19–20): лонг-рид 200–500 слов
   (деф. 350) + картинка.
-- Оба поста проходят автоцензуру и **ручную модерацию** (кнопки:
+- Оба поста проходят автоцензуру и ручную модерацию (кнопки:
   опубликовать / регенерировать / отклонить). При простое — автопубликация
   по дедлайну `PUBLISH_WINDOW_END`.
 - Длина настраивается из админки: `/setlen morning N` (1–3),
-  `/setlen evening N` (200–500) → сохраняется в таблице settings.
+  `/setlen evening N` (200–500) — сохраняется в таблице settings.
 
 ## Комментарии
 
@@ -48,15 +48,14 @@
 
 ## Структура
 
-
 bot.py, config.py, scheduler.py
 db/(schema.sql, database.py)
 ai/(gemini.py, prompts.py)
 services/(content.py, publisher.py, comments.py)
-handlers/(admin.py, group.py, __init__→ROUTERS)
+handlers/(admin.py, group.py, __init__ -> ROUTERS)
 scripts/ai_healthcheck.py
 
-CI (7 джоб)
+## CI (7 джоб)
 syntax check, ruff==0.15.12, bandit==1.9.4 (-ll), pip-audit,
 pytest --cov-fail-under=45, codespell, mypy==1.14.1.
 main защищён — только через PR с зелёным CI. .env.example содержит

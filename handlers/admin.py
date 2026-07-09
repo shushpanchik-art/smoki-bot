@@ -38,6 +38,12 @@ def _cb_arg(cq: CallbackQuery) -> int:
     return int((cq.data or "").split(":")[1])
 
 
+def _bot(cq: CallbackQuery) -> Bot:
+    """Достать Bot из callback (mypy-safe)."""
+    assert cq.bot is not None
+    return cq.bot
+
+
 def _is_skip(text: str | None) -> bool:
     return not text or text.strip().lower() in SKIP
 
@@ -147,7 +153,7 @@ async def cb_publish(cq: CallbackQuery, state: FSMContext):
     await state.update_data(article_id=aid)
     await cq.answer()
     await _clear_markup(cq)
-    await cq.bot.send_message(
+    await _bot(cq).send_message(
         config.ADMIN_CHAT_ID,
         f"✍️ Что понравилось в статье #{aid}? "
         "Напиши — я запомню стиль. Или отправь <code>-</code>, чтобы просто опубликовать.",
@@ -169,7 +175,7 @@ async def cb_regen(cq: CallbackQuery, state: FSMContext):
     await state.update_data(article_id=aid, regen_count=regen)
     await cq.answer()
     await _clear_markup(cq)
-    await cq.bot.send_message(
+    await _bot(cq).send_message(
         config.ADMIN_CHAT_ID,
         f"✍️ Что улучшить в статье #{aid}? "
         "Опиши правки — учту при генерации. Или <code>-</code> для обычного регена.",
@@ -186,7 +192,7 @@ async def cb_reject(cq: CallbackQuery, state: FSMContext):
     await state.update_data(article_id=aid)
     await cq.answer()
     await _clear_markup(cq)
-    await cq.bot.send_message(
+    await _bot(cq).send_message(
         config.ADMIN_CHAT_ID,
         f"✍️ Что не так со статьёй #{aid}? "
         "Опиши — добавлю в правила цензуры и сгенерирую заново. "
@@ -200,7 +206,7 @@ async def fb_publish(message: Message, bot: Bot, state: FSMContext):
     if not _is_admin(message):
         return
     data = await state.get_data()
-    aid = data.get("article_id")
+    aid = int(data.get("article_id") or 0)
     await state.clear()
     fb = message.text or ""
     if not _is_skip(fb):
@@ -218,7 +224,7 @@ async def fb_regen(message: Message, bot: Bot, state: FSMContext):
     if not _is_admin(message):
         return
     data = await state.get_data()
-    aid = data.get("article_id")
+    aid = int(data.get("article_id") or 0)
     regen = data.get("regen_count", 0)
     await state.clear()
     fb = message.text or ""
@@ -245,7 +251,7 @@ async def fb_reject(message: Message, bot: Bot, state: FSMContext):
     if not _is_admin(message):
         return
     data = await state.get_data()
-    aid = data.get("article_id")
+    aid = int(data.get("article_id") or 0)
     await state.clear()
     fb = message.text or ""
     await db.update_article(aid, status="rejected")

@@ -1,5 +1,4 @@
 """Тесты чистой логики контента: _split, _clean_html, censor."""
-import pytest
 
 from services import content
 from services.publisher import _split

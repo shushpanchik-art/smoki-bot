@@ -2,6 +2,8 @@ import logging
 
 from aiogram import Router, F, Bot
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
     Message, CallbackQuery, FSInputFile,
     InlineKeyboardMarkup, InlineKeyboardButton,
@@ -14,6 +16,14 @@ from services import content, publisher
 logger = logging.getLogger(__name__)
 router = Router(name="admin")
 
+SKIP = {"-", "—", "нет", "no", "skip", "пропустить"}
+
+
+class ModerationStates(StatesGroup):
+    waiting_publish_fb = State()
+    waiting_regen_fb = State()
+    waiting_reject_fb = State()
+
 
 def _is_admin_id(uid: int) -> bool:
     return bool(config.ADMIN_CHAT_ID) and uid == config.ADMIN_CHAT_ID
@@ -24,12 +34,15 @@ def _is_admin(message: Message) -> bool:
 
 
 def _cb_arg(cq: CallbackQuery) -> int:
-    """Извлечь int-аргумент после ':' из callback_data (с guard)."""
+    """Извлечь int-аргумент после ':' из callback_data."""
     return int((cq.data or "").split(":")[1])
 
 
+def _is_skip(text: str | None) -> bool:
+    return not text or text.strip().lower() in SKIP
+
+
 async def _clear_markup(cq: CallbackQuery) -> None:
-    """Убрать клавиатуру у сообщения callback (с guard на None/Inaccessible)."""
     msg = cq.message
     if msg is not None and hasattr(msg, "edit_reply_markup"):
         try:
@@ -69,7 +82,6 @@ async def send_for_moderation(bot: Bot, article_id: int):
     else:
         if has_img:
             await bot.send_photo(config.ADMIN_CHAT_ID, FSInputFile(str(image_path)))
-        # текст: если длинный — режем, кнопки на последнем куске
         parts = publisher._split(body, 4000)
         for i, part in enumerate(parts):
             prefix = header if i == 0 else ""
@@ -124,26 +136,26 @@ async def cmd_generate(message: Message, bot: Bot):
     await send_for_moderation(bot, res["article_id"])
 
 
-# ---------- модерация (callbacks) ----------
+# ---------- модерация: кнопка → спросить фидбэк (FSM) ----------
 @router.callback_query(F.data.startswith("pub:"))
-async def cb_publish(cq: CallbackQuery, bot: Bot):
+async def cb_publish(cq: CallbackQuery, state: FSMContext):
     if not _is_admin_id(cq.from_user.id):
         await cq.answer("Не для тебя", show_alert=True)
         return
     aid = _cb_arg(cq)
-    await cq.answer("Публикую…")
-    res = await publisher.publish_article(bot, aid)
-    if res["ok"]:
-        await _clear_markup(cq)
-        await bot.send_message(config.ADMIN_CHAT_ID,
-                               f"✅ Статья #{aid} опубликована (msg {res['message_id']}).")
-    else:
-        await bot.send_message(config.ADMIN_CHAT_ID,
-                               f"❌ Ошибка публикации #{aid}: {res['error']}")
+    await state.set_state(ModerationStates.waiting_publish_fb)
+    await state.update_data(article_id=aid)
+    await cq.answer()
+    await _clear_markup(cq)
+    await cq.bot.send_message(
+        config.ADMIN_CHAT_ID,
+        f"✍️ Что понравилось в статье #{aid}? "
+        "Напиши — я запомню стиль. Или отправь <code>-</code>, чтобы просто опубликовать.",
+    )
 
 
 @router.callback_query(F.data.startswith("regen:"))
-async def cb_regen(cq: CallbackQuery, bot: Bot):
+async def cb_regen(cq: CallbackQuery, state: FSMContext):
     if not _is_admin_id(cq.from_user.id):
         await cq.answer("Не для тебя", show_alert=True)
         return
@@ -153,29 +165,103 @@ async def cb_regen(cq: CallbackQuery, bot: Bot):
     if regen >= config.MAX_REGEN:
         await cq.answer(f"Лимит перегенераций ({config.MAX_REGEN}) исчерпан", show_alert=True)
         return
-    await cq.answer("Генерирую заново…")
-    try:
-        res = await content.generate_article()  # новая тема
-    except Exception as e:
-        await bot.send_message(config.ADMIN_CHAT_ID, f"❌ Ошибка регена: {e}")
-        return
-    if not res.get("ok"):
-        await bot.send_message(config.ADMIN_CHAT_ID,
-                               f"🚫 Реген не прошёл цензуру: {res.get('reason','')[:400]}")
-        return
-    # перенос счётчика
-    await db.update_article(res["article_id"], regen_count=regen + 1)
-    await db.update_article(aid, status="rejected")
+    await state.set_state(ModerationStates.waiting_regen_fb)
+    await state.update_data(article_id=aid, regen_count=regen)
+    await cq.answer()
     await _clear_markup(cq)
-    await send_for_moderation(bot, res["article_id"])
+    await cq.bot.send_message(
+        config.ADMIN_CHAT_ID,
+        f"✍️ Что улучшить в статье #{aid}? "
+        "Опиши правки — учту при генерации. Или <code>-</code> для обычного регена.",
+    )
 
 
 @router.callback_query(F.data.startswith("rej:"))
-async def cb_reject(cq: CallbackQuery):
+async def cb_reject(cq: CallbackQuery, state: FSMContext):
     if not _is_admin_id(cq.from_user.id):
         await cq.answer("Не для тебя", show_alert=True)
         return
     aid = _cb_arg(cq)
-    await db.update_article(aid, status="rejected")
-    await cq.answer("Отклонено")
+    await state.set_state(ModerationStates.waiting_reject_fb)
+    await state.update_data(article_id=aid)
+    await cq.answer()
     await _clear_markup(cq)
+    await cq.bot.send_message(
+        config.ADMIN_CHAT_ID,
+        f"✍️ Что не так со статьёй #{aid}? "
+        "Опиши — добавлю в правила цензуры и сгенерирую заново. "
+        "Или <code>-</code>, чтобы просто перегенерировать.",
+    )
+
+
+# ---------- модерация: приём текстового фидбэка ----------
+@router.message(ModerationStates.waiting_publish_fb)
+async def fb_publish(message: Message, bot: Bot, state: FSMContext):
+    if not _is_admin(message):
+        return
+    data = await state.get_data()
+    aid = data.get("article_id")
+    await state.clear()
+    fb = message.text or ""
+    if not _is_skip(fb):
+        await db.update_article(aid, admin_feedback=fb)
+        await db.append_setting("liked_feedback", fb)
+    res = await publisher.publish_article(bot, aid)
+    if res["ok"]:
+        await message.answer(f"✅ Статья #{aid} опубликована (msg {res['message_id']}).")
+    else:
+        await message.answer(f"❌ Ошибка публикации #{aid}: {res['error']}")
+
+
+@router.message(ModerationStates.waiting_regen_fb)
+async def fb_regen(message: Message, bot: Bot, state: FSMContext):
+    if not _is_admin(message):
+        return
+    data = await state.get_data()
+    aid = data.get("article_id")
+    regen = data.get("regen_count", 0)
+    await state.clear()
+    fb = message.text or ""
+    extra = None if _is_skip(fb) else fb
+    if extra:
+        await db.update_article(aid, admin_feedback=extra)
+    await message.answer("🔄 Генерирую заново…")
+    try:
+        res = await content.generate_article(extra_rules=extra)
+    except Exception as e:
+        logger.exception("regen")
+        await message.answer(f"❌ Ошибка регена: {e}")
+        return
+    if not res.get("ok"):
+        await message.answer(f"🚫 Реген не прошёл цензуру: {res.get('reason','')[:400]}")
+        return
+    await db.update_article(res["article_id"], regen_count=regen + 1)
+    await db.update_article(aid, status="rejected")
+    await send_for_moderation(bot, res["article_id"])
+
+
+@router.message(ModerationStates.waiting_reject_fb)
+async def fb_reject(message: Message, bot: Bot, state: FSMContext):
+    if not _is_admin(message):
+        return
+    data = await state.get_data()
+    aid = data.get("article_id")
+    await state.clear()
+    fb = message.text or ""
+    await db.update_article(aid, status="rejected")
+    extra = None
+    if not _is_skip(fb):
+        await db.update_article(aid, admin_feedback=fb)
+        await db.append_setting("censor_extra", fb)
+        extra = fb
+    await message.answer("❌ Отклонено. 🔄 Генерирую заново с учётом замечаний…")
+    try:
+        res = await content.generate_article(extra_rules=extra)
+    except Exception as e:
+        logger.exception("reject-regen")
+        await message.answer(f"❌ Ошибка регена: {e}")
+        return
+    if not res.get("ok"):
+        await message.answer(f"🚫 Реген не прошёл цензуру: {res.get('reason','')[:400]}")
+        return
+    await send_for_moderation(bot, res["article_id"])

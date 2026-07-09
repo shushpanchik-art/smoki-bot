@@ -56,3 +56,13 @@ GEN_WINDOW_START = _int("GEN_WINDOW_START", 6)
 GEN_WINDOW_END = _int("GEN_WINDOW_END", 7)
 PUBLISH_WINDOW_START = _int("PUBLISH_WINDOW_START", 11)
 PUBLISH_WINDOW_END = _int("PUBLISH_WINDOW_END", 13)
+
+# --- Два поста в день: утро (факты) и вечер (лонг-рид) ---
+MORNING_START = _int("MORNING_START", 8)
+MORNING_END = _int("MORNING_END", 10)
+EVENING_START = _int("EVENING_START", 19)
+EVENING_END = _int("EVENING_END", 20)
+# Дефолты длины (переопределяются из settings через админку)
+MORNING_LEN_DEFAULT = _int("MORNING_LEN_DEFAULT", 3)      # число фактов 1-3
+EVENING_WORDS_DEFAULT = _int("EVENING_WORDS_DEFAULT", 350)  # слов 200-500
+

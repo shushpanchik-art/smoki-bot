@@ -12,6 +12,7 @@ from aiogram.types import (
 import config
 from db import database as db
 from services import content, publisher
+from ai import prompts
 
 logger = logging.getLogger(__name__)
 router = Router(name="admin")
@@ -120,7 +121,10 @@ async def cmd_start(message: Message):
     await message.answer(
         "👋 SMOKI content bot готов.\n\n"
         "Команды:\n"
-        "/generate — сгенерировать черновик поста\n"
+        "/generate — черновик поста (обычный)\n"
+        "/generate morning — утренний формат (факты, тек. длина)\n"
+        "/generate evening — вечерний лонг-рид (тек. длина)\n"
+        "/setlen — показать/изменить желаемую длину постов\n"
         "/id — показать id чата"
     )
 
@@ -129,9 +133,25 @@ async def cmd_start(message: Message):
 async def cmd_generate(message: Message, bot: Bot):
     if not _is_admin(message):
         return
-    await message.answer("⏳ Генерирую черновик, подожди ~30-60 сек…")
+    parts = (message.text or "").split()
+    fmt = parts[1].lower() if len(parts) > 1 else ""
+    extra_rules = None
+    if fmt == "morning":
+        n = int(await db.get_setting(
+            "morning_facts", str(config.MORNING_LEN_DEFAULT))
+            or config.MORNING_LEN_DEFAULT)
+        extra_rules = prompts.facts_rules(n)
+        await message.answer(f"⏳ Утренний формат ({n} факт(ов))…")
+    elif fmt == "evening":
+        w = int(await db.get_setting(
+            "evening_words", str(config.EVENING_WORDS_DEFAULT))
+            or config.EVENING_WORDS_DEFAULT)
+        extra_rules = prompts.words_rule(w)
+        await message.answer(f"⏳ Вечерний лонг-рид (~{w} слов)…")
+    else:
+        await message.answer("⏳ Генерирую черновик, подожди ~30-60 сек…")
     try:
-        res = await content.generate_article()
+        res = await content.generate_article(extra_rules=extra_rules)
     except Exception as e:
         logger.exception("generate")
         await message.answer(f"❌ Ошибка генерации: {e}")

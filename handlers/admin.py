@@ -8,6 +8,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
     Message, CallbackQuery, FSInputFile,
     InlineKeyboardMarkup, InlineKeyboardButton,
+    ReplyKeyboardMarkup, KeyboardButton,
 )
 
 import config
@@ -129,6 +130,17 @@ async def cmd_id(message: Message):
     )
 
 
+def _main_kb() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="/generate"), KeyboardButton(text="/setlen")],
+            [KeyboardButton(text="/generate_morning"),
+             KeyboardButton(text="/generate_evening")],
+        ],
+        resize_keyboard=True,
+    )
+
+
 @router.message(Command("start"))
 async def cmd_start(message: Message):
     if message.chat.type != "private":
@@ -147,7 +159,8 @@ async def cmd_start(message: Message):
         "/generate_morning — утренний формат (факты)\n"
         "/generate_evening — вечерний лонг-рид\n"
         "/setlen — показать/изменить желаемую длину постов\n"
-        "/id — показать id чата"
+        "/id — показать id чата",
+        reply_markup=_main_kb(),
     )
 
 

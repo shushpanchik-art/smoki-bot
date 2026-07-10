@@ -44,7 +44,7 @@ def article_prompt(topic: str, used_topics: list[str] | None = None,
                    daytime: str | None = None) -> str:
     used = ""
     daytime_line = (
-        f"\nУчитывай текущее UTC+5 время суток в подаче и настроении текста.\n"
+        "\nУчитывай текущее UTC+5 время суток в подаче и настроении текста.\n"
         if daytime else ""
     )
     if used_topics:

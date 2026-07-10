@@ -50,4 +50,4 @@
 
 ## CI
 
-7 джоб: syntax, ruff, bandit, pip-audit, pytest (cov 45), codespell, mypy. main защищён, только через PR с зелёным CI. .env.example содержит все ключи config.py.
+10 джоб: syntax, ruff, bandit, pip-audit, pytest (cov 45), codespell, mypy, gitleaks, yamllint, markdownlint. main защищён, только через PR с зелёным CI. .env.example содержит все ключи config.py.

@@ -144,19 +144,16 @@ async def cmd_start(message: Message):
         "👋 SMOKI content bot готов.\n\n"
         "Команды:\n"
         "/generate — черновик поста (обычный)\n"
-        "/generate morning — утренний формат (факты, тек. длина)\n"
-        "/generate evening — вечерний лонг-рид (тек. длина)\n"
+        "/generate_morning — утренний формат (факты)\n"
+        "/generate_evening — вечерний лонг-рид\n"
         "/setlen — показать/изменить желаемую длину постов\n"
         "/id — показать id чата"
     )
 
 
-@router.message(Command("generate"))
-async def cmd_generate(message: Message, bot: Bot):
+async def _do_generate(message: Message, bot: Bot, fmt: str = ""):
     if not _is_admin(message):
         return
-    parts = (message.text or "").split()
-    fmt = parts[1].lower() if len(parts) > 1 else ""
     length_hint = None
     if fmt == "morning":
         n = int(await db.get_setting(
@@ -182,6 +179,24 @@ async def cmd_generate(message: Message, bot: Bot):
         await message.answer(f"🚫 Не прошло цензуру:\n{res.get('reason','')[:500]}")
         return
     await send_for_moderation(bot, res["article_id"])
+
+
+@router.message(Command("generate"))
+async def cmd_generate(message: Message, bot: Bot):
+    """/generate или /generate morning|evening (аргумент опционален)."""
+    parts = (message.text or "").split()
+    fmt = parts[1].lower() if len(parts) > 1 else ""
+    await _do_generate(message, bot, fmt)
+
+
+@router.message(Command("generate_morning"))
+async def cmd_generate_morning(message: Message, bot: Bot):
+    await _do_generate(message, bot, "morning")
+
+
+@router.message(Command("generate_evening"))
+async def cmd_generate_evening(message: Message, bot: Bot):
+    await _do_generate(message, bot, "evening")
 
 
 # ---------- модерация: кнопка → спросить фидбэк (FSM) ----------

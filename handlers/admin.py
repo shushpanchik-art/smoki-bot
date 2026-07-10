@@ -157,23 +157,23 @@ async def cmd_generate(message: Message, bot: Bot):
         return
     parts = (message.text or "").split()
     fmt = parts[1].lower() if len(parts) > 1 else ""
-    length_hint = None
+    extra_rules = None
     if fmt == "morning":
         n = int(await db.get_setting(
             "morning_facts", str(config.MORNING_LEN_DEFAULT))
             or config.MORNING_LEN_DEFAULT)
-        length_hint = prompts.facts_rules(n)
+        extra_rules = prompts.facts_rules(n)
         await message.answer(f"⏳ Утренний формат ({n} факт(ов))…")
     elif fmt == "evening":
         w = int(await db.get_setting(
             "evening_words", str(config.EVENING_WORDS_DEFAULT))
             or config.EVENING_WORDS_DEFAULT)
-        length_hint = prompts.words_rule(w)
+        extra_rules = prompts.words_rule(w)
         await message.answer(f"⏳ Вечерний лонг-рид (~{w} слов)…")
     else:
         await message.answer("⏳ Генерирую черновик, подожди ~30-60 сек…")
     try:
-        res = await content.generate_article(length_hint=length_hint)
+        res = await content.generate_article(extra_rules=extra_rules)
     except Exception as e:
         logger.exception("generate")
         await message.answer(f"❌ Ошибка генерации: {e}")

@@ -45,12 +45,26 @@ async def _image(prompt: str) -> bytes | None:
 
 
 async def generate_topic() -> str:
-    """Придумать уникальную тему (с учётом уже опубликованных)."""
+    """Свежая тема строго в нише. Повтор при вылете за рамки."""
     used = await db.get_used_topics()
-    raw = await _text(prompts.topic_prompt(used), temperature=1.0,
-                      max_output_tokens=200)
-    topic = raw.strip().strip('«»"\'').split("\n")[0].strip()
-    return topic or "Культура курения: интересные факты"
+    keywords = (
+        "вейп", "кальян", "табак", "сигарет", "испарит", "жидкост",
+        "никотин", "под", "койл", "уголь", "чаш", "колб", "шланг",
+        "курен", "дым", "смес", "ароматизат", "бренд", "устройств",
+    )
+    fallback = "Культура курения: интересные факты"
+    last = fallback
+    for _ in range(3):
+        raw = await _text(prompts.topic_prompt(used), temperature=0.9,
+                          max_output_tokens=512)
+        topic = raw.strip().strip('«»"\'').split("\n")[0].strip()
+        if not topic:
+            continue
+        last = topic
+        if any(k in topic.lower() for k in keywords):
+            return topic
+        logger.warning("Тема вне ниши, повтор: %s", topic)
+    return last or fallback
 
 
 async def censor(text: str) -> tuple[bool, str]:

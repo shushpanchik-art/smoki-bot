@@ -131,8 +131,10 @@ async def generate_article(topic: str | None = None,
 
     used = await db.get_used_topics()
     rules = await _accumulated_rules(extra_rules)
+    daytime = prompts.daytime_label(datetime.datetime.now().hour)
     body_raw = await _text(prompts.article_prompt(
-        topic, used, extra_rules=rules, length_hint=length_hint))
+        topic, used, extra_rules=rules, length_hint=length_hint,
+        daytime=daytime))
     body = _clean_html(body_raw)
 
     ok, result = await censor(body)

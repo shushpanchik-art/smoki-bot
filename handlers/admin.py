@@ -64,6 +64,9 @@ def _kb(article_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text="✅ Опубликовать", callback_data=f"pub:{article_id}"),
+            InlineKeyboardButton(text="📌 Опубл. + стиль", callback_data=f"pubfb:{article_id}"),
+        ],
+        [
             InlineKeyboardButton(text="🔄 Заново", callback_data=f"regen:{article_id}"),
             InlineKeyboardButton(text="❌ Отклонить", callback_data=f"rej:{article_id}"),
         ],
@@ -388,14 +391,46 @@ async def cb_publish(cq: CallbackQuery, state: FSMContext):
         await cq.answer("Не для тебя", show_alert=True)
         return
     aid = _cb_arg(cq)
+    await cq.answer("Публикую…")
+    await _clear_markup(cq)
+    bot = _bot(cq)
+    res = await publisher.publish_article(bot, aid)
+    if res["ok"]:
+        await bot.send_message(
+            config.ADMIN_CHAT_ID,
+            f"✅ Статья #{aid} опубликована (msg {res['message_id']}).",
+        )
+    else:
+        await bot.send_message(
+            config.ADMIN_CHAT_ID,
+            f"❌ Ошибка публикации #{aid}: {res['error']}",
+        )
+
+
+@router.callback_query(F.data.startswith("pubfb:"))
+async def cb_publish_fb(cq: CallbackQuery, state: FSMContext):
+    """Опубликовать сразу и спросить, что понравилось (для запоминания стиля)."""
+    if not _is_admin_id(cq.from_user.id):
+        await cq.answer("Не для тебя", show_alert=True)
+        return
+    aid = _cb_arg(cq)
+    await cq.answer("Публикую…")
+    await _clear_markup(cq)
+    bot = _bot(cq)
+    res = await publisher.publish_article(bot, aid)
+    if not res["ok"]:
+        await bot.send_message(
+            config.ADMIN_CHAT_ID,
+            f"❌ Ошибка публикации #{aid}: {res['error']}",
+        )
+        return
     await state.set_state(ModerationStates.waiting_publish_fb)
     await state.update_data(article_id=aid)
-    await cq.answer()
-    await _clear_markup(cq)
-    await _bot(cq).send_message(
+    await bot.send_message(
         config.ADMIN_CHAT_ID,
-        f"✍️ Что понравилось в статье #{aid}? "
-        "Напиши — я запомню стиль. Или отправь <code>-</code>, чтобы просто опубликовать.",
+        f"✅ Статья #{aid} опубликована (msg {res['message_id']}).\n\n"
+        f"✍️ Что понравилось? Напиши — запомню стиль. "
+        "Или <code>-</code>, чтобы ничего не сохранять.",
     )
 
 
@@ -405,6 +440,9 @@ async def cb_regen(cq: CallbackQuery, state: FSMContext):
         await cq.answer("Не для тебя", show_alert=True)
         return
     aid = _cb_arg(cq)
+    if await state.get_state() is not None:
+        await cq.answer("Сначала закончи с предыдущей статьёй или нажми ⛔ Отмена", show_alert=True)
+        return
     old = await db.get_article(aid)
     regen = (old.get("regen_count") or 0) if old else 0
     if regen >= config.MAX_REGEN:
@@ -427,6 +465,9 @@ async def cb_reject(cq: CallbackQuery, state: FSMContext):
         await cq.answer("Не для тебя", show_alert=True)
         return
     aid = _cb_arg(cq)
+    if await state.get_state() is not None:
+        await cq.answer("Сначала закончи с предыдущей статьёй или нажми ⛔ Отмена", show_alert=True)
+        return
     await state.set_state(ModerationStates.waiting_reject_fb)
     await state.update_data(article_id=aid)
     await cq.answer()
@@ -465,14 +506,12 @@ async def fb_publish(message: Message, bot: Bot, state: FSMContext):
     aid = int(data.get("article_id") or 0)
     await state.clear()
     fb = message.text or ""
-    if not _is_skip(fb):
-        await db.update_article(aid, admin_feedback=fb)
-        await db.append_setting("liked_feedback", fb)
-    res = await publisher.publish_article(bot, aid)
-    if res["ok"]:
-        await message.answer(f"✅ Статья #{aid} опубликована (msg {res['message_id']}).")
-    else:
-        await message.answer(f"❌ Ошибка публикации #{aid}: {res['error']}")
+    if _is_skip(fb):
+        await message.answer("Ок, стиль не сохранён.")
+        return
+    await db.update_article(aid, admin_feedback=fb)
+    await db.append_setting("liked_feedback", fb)
+    await message.answer(f"📌 Запомнил стиль по статье #{aid}.")
 
 
 @router.message(ModerationStates.waiting_regen_fb)

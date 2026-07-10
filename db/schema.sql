@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS articles (
   status TEXT DEFAULT 'pending',
   admin_feedback TEXT,
   regen_count INTEGER DEFAULT 0,
+  length_hint TEXT,
   message_id INTEGER,
   created_at TEXT DEFAULT (datetime('now')),
   published_at TEXT

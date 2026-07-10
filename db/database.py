@@ -57,12 +57,13 @@ async def set_topic_status(topic_id: int, status: str):
 
 # ---------- articles ----------
 async def add_article(topic_id: int, body: str, image_path: str | None = None,
-                      image_prompt: str | None = None) -> int:
+                      image_prompt: str | None = None,
+                      length_hint: str | None = None) -> int:
     async with aiosqlite.connect(config.DB_PATH) as db:
         cur = await db.execute(
-            "INSERT INTO articles (topic_id, body, image_path, image_prompt) "
-            "VALUES (?, ?, ?, ?)",
-            (topic_id, body, image_path, image_prompt),
+            "INSERT INTO articles (topic_id, body, image_path, image_prompt, "
+            "length_hint) VALUES (?, ?, ?, ?, ?)",
+            (topic_id, body, image_path, image_prompt, length_hint),
         )
         await db.commit()
         return int(cur.lastrowid or 0)
@@ -84,6 +85,14 @@ async def update_article(article_id: int, **fields):
     async with aiosqlite.connect(config.DB_PATH) as db:
         await db.execute(f"UPDATE articles SET {cols} WHERE id = ?", vals)
         await db.commit()
+
+
+async def get_article_length_hint(article_id: int) -> str | None:
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT length_hint FROM articles WHERE id = ?", (article_id,))
+        row = await cur.fetchone()
+        return row[0] if row and row[0] else None
 
 
 async def get_approved_article() -> dict | None:

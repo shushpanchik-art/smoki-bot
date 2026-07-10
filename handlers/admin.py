@@ -296,8 +296,6 @@ async def cmd_start(message: Message):
 
 
 async def _do_generate(message: Message, bot: Bot, fmt: str = ""):
-    if not _is_admin(message):
-        return
     length_hint = None
     if fmt == "morning":
         n = int(await db.get_setting(
@@ -328,6 +326,8 @@ async def _do_generate(message: Message, bot: Bot, fmt: str = ""):
 @router.message(Command("generate"))
 async def cmd_generate(message: Message, bot: Bot):
     """/generate или /generate morning|evening (аргумент опционален)."""
+    if not _is_admin(message):
+        return
     parts = (message.text or "").split()
     fmt = parts[1].lower() if len(parts) > 1 else ""
     await _do_generate(message, bot, fmt)
@@ -335,11 +335,15 @@ async def cmd_generate(message: Message, bot: Bot):
 
 @router.message(Command("generate_morning"))
 async def cmd_generate_morning(message: Message, bot: Bot):
+    if not _is_admin(message):
+        return
     await _do_generate(message, bot, "morning")
 
 
 @router.message(Command("generate_evening"))
 async def cmd_generate_evening(message: Message, bot: Bot):
+    if not _is_admin(message):
+        return
     await _do_generate(message, bot, "evening")
 
 

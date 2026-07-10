@@ -4,6 +4,7 @@ import datetime
 import logging
 import re
 import time
+import uuid
 from pathlib import Path
 
 import config
@@ -151,7 +152,7 @@ async def generate_article(topic: str | None = None,
         try:
             data = await _image(img_prompt)
             if data:
-                fname = f"art_{int(time.time())}.png"
+                fname = f"art_{int(time.time())}_{uuid.uuid4().hex[:8]}.png"
                 fpath = MEDIA_DIR / fname
                 fpath.write_bytes(data)
                 image_path = str(fpath)

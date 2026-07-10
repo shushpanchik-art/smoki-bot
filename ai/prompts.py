@@ -121,11 +121,16 @@ def image_prompt(topic: str) -> str:
     scene = _IMG_SCENES[h % len(_IMG_SCENES)]
     palette = _IMG_PALETTES[(h // 7) % len(_IMG_PALETTES)]
     return (
+        "CRITICAL: absolutely NO TEXT anywhere in the image. "
+        "No letters, no words, no captions, no titles, no headlines, "
+        "no signage, no typography, no writing. Book spines and labels "
+        "must be blank or blurred with no readable characters. "
+        "This is a purely visual wordless photographic illustration. "
         "High-quality editorial illustration for an article "
         f"about: {topic}. Theme: smoking culture (vapes, hookah, tobacco). "
         f"Composition: {scene}. Colour palette: {palette}. "
         "Stylish, cinematic, magazine cover quality. "
-        "No text, no logos, no watermarks, no people's faces in focus."
+        "No logos, no watermarks, no people's faces in focus."
     )
 
 

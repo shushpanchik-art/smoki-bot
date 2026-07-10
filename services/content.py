@@ -98,7 +98,6 @@ async def _accumulated_rules(extra: str | None = None) -> str | None:
 
 async def generate_article(topic: str | None = None,
                            extra_rules: str | None = None,
-                           length_hint: str | None = None,
                            make_image: bool = True) -> dict:
     """Полный цикл: тема → статья → цензура → картинка → запись в БД.
 
@@ -110,8 +109,7 @@ async def generate_article(topic: str | None = None,
 
     used = await db.get_used_topics()
     rules = await _accumulated_rules(extra_rules)
-    body_raw = await _text(prompts.article_prompt(
-        topic, used, extra_rules=rules, length_hint=length_hint))
+    body_raw = await _text(prompts.article_prompt(topic, used, rules))
     body = _clean_html(body_raw)
 
     ok, result = await censor(body)

@@ -15,11 +15,11 @@ logger = logging.getLogger("smoki.scheduler")
 _scheduler: AsyncIOScheduler | None = None
 
 
-async def _generate_and_moderate(bot, length_hint: str, label: str):
+async def _generate_and_moderate(bot, extra_rules: str, label: str):
     from handlers import admin
     logger.info("Планировщик: старт генерации (%s)", label)
     try:
-        res = await content.generate_article(length_hint=length_hint)
+        res = await content.generate_article(extra_rules=extra_rules)
         if not res.get("ok"):
             logger.warning("Генерация не удалась: %s", res.get("reason"))
             try:
@@ -96,14 +96,7 @@ def start(bot) -> AsyncIOScheduler:
     if _scheduler:
         return _scheduler
 
-    sched = AsyncIOScheduler(
-        timezone="Europe/Moscow",
-        job_defaults={
-            "misfire_grace_time": 3600,
-            "coalesce": True,
-            "max_instances": 1,
-        },
-    )
+    sched = AsyncIOScheduler(timezone="Europe/Moscow")
 
     # Утренний пост (факты): случайная минута в начале утреннего окна
     m_min = _random_minute()

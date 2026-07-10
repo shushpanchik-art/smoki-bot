@@ -60,11 +60,16 @@ async def _clear_markup(cq: CallbackQuery) -> None:
 
 
 def _kb(article_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="✅ Опубликовать", callback_data=f"pub:{article_id}"),
-        InlineKeyboardButton(text="🔄 Заново", callback_data=f"regen:{article_id}"),
-        InlineKeyboardButton(text="❌ Отклонить", callback_data=f"rej:{article_id}"),
-    ]])
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ Опубликовать", callback_data=f"pub:{article_id}"),
+            InlineKeyboardButton(text="🔄 Заново", callback_data=f"regen:{article_id}"),
+            InlineKeyboardButton(text="❌ Отклонить", callback_data=f"rej:{article_id}"),
+        ],
+        [
+            InlineKeyboardButton(text="⛔ Отмена", callback_data=f"cancel:{article_id}"),
+        ],
+    ])
 
 
 CAPTION_LIMIT = 1024
@@ -268,6 +273,23 @@ async def cb_reject(cq: CallbackQuery, state: FSMContext):
         f"✍️ Что не так со статьёй #{aid}? "
         "Опиши — добавлю в правила цензуры и сгенерирую заново. "
         "Или <code>-</code>, чтобы просто перегенерировать.",
+    )
+
+
+@router.callback_query(F.data.startswith("cancel:"))
+async def cb_cancel(cq: CallbackQuery, state: FSMContext):
+    """Админ передумал: закрыть модерацию без публикации и без регенерации."""
+    if not _is_admin_id(cq.from_user.id):
+        await cq.answer("Не для тебя", show_alert=True)
+        return
+    aid = _cb_arg(cq)
+    await state.clear()
+    await db.update_article(aid, status="cancelled")
+    await cq.answer("Отменено")
+    await _clear_markup(cq)
+    await _bot(cq).send_message(
+        config.ADMIN_CHAT_ID,
+        f"⛔ Статья #{aid} снята с публикации. Ничего не отправлено.",
     )
 
 

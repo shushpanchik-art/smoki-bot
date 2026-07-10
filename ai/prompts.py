@@ -2,6 +2,7 @@
 
 ID моделей — только через config/.env, здесь не хардкодим.
 """
+import hashlib
 
 # Тематика канала SMOKTOLK
 NICHE = (
@@ -44,7 +45,13 @@ def article_prompt(topic: str, used_topics: list[str] | None = None,
                    daytime: str | None = None) -> str:
     used = ""
     daytime_line = (
-        "\nУчитывай текущее UTC+5 время суток в подаче и настроении текста.\n"
+        f"\nСЕЙЧАС: {daytime} (по местному времени UTC+5). "
+        "Учитывай это в подаче и настроении. "
+        "ВАЖНО: если используешь приветствие — оно ДОЛЖНО "
+        f"соответствовать времени суток ({daytime}). "
+        "НЕ пиши «Доброе утро», если сейчас не утро; "
+        "НЕ пиши «Добрый вечер», если сейчас не вечер. "
+        "Лучше вообще без приветствия, чем с неверным.\n"
         if daytime else ""
     )
     if used_topics:
@@ -86,12 +93,39 @@ def topic_prompt(used_topics: list[str] | None = None) -> str:
 
 
 # ── Картинка ──────────────────────────────────────────────────────
+_IMG_SCENES = [
+    "close-up macro shot with shallow depth of field",
+    "flat-lay top-down composition on a textured surface",
+    "wide atmospheric interior scene with warm ambient light",
+    "dramatic side lighting against a dark background",
+    "minimalist still life on a clean neutral backdrop",
+    "vintage retro aesthetic with film-grain texture",
+    "moody nightlife setting with neon accents",
+    "cozy evening scene with soft bokeh lights",
+]
+_IMG_PALETTES = [
+    "warm amber and deep brown tones",
+    "cool teal and smoky grey palette",
+    "rich emerald and gold accents",
+    "muted pastel colours",
+    "high-contrast black and white with a single accent colour",
+    "sunset orange and purple gradient",
+]
+
+
 def image_prompt(topic: str) -> str:
+    """Вариативный промпт: сцена и палитра зависят от темы (детерминированно),
+    чтобы разные статьи получали визуально разные картинки.
+    """
+    h = int(hashlib.md5(topic.encode("utf-8")).hexdigest(), 16)  # noqa: S324
+    scene = _IMG_SCENES[h % len(_IMG_SCENES)]
+    palette = _IMG_PALETTES[(h // 7) % len(_IMG_PALETTES)]
     return (
-        "High-quality atmospheric editorial illustration for an article "
+        "High-quality editorial illustration for an article "
         f"about: {topic}. Theme: smoking culture (vapes, hookah, tobacco). "
-        "Stylish, moody lighting, no text, no logos, no watermarks, "
-        "no people's faces in focus. Cinematic, magazine cover quality."
+        f"Composition: {scene}. Colour palette: {palette}. "
+        "Stylish, cinematic, magazine cover quality. "
+        "No text, no logos, no watermarks, no people's faces in focus."
     )
 
 
@@ -143,7 +177,7 @@ def facts_rules(n: int) -> str:
     """Утро (08:00-10:00): короткий позитивный пост с фактами."""
     n = max(1, min(3, n))
     return (
-        "ЭТО УТРЕННИЙ ПОСТ. СТРОГО СОБЛЮДАЙ ФОРМАТ, "
+        "ЭТО ПОСТ-ПОДБОРКА ФАКТОВ. СТРОГО СОБЛЮДАЙ ФОРМАТ, "
         "он ПОЛНОСТЬЮ ОТМЕНЯЕТ любые прежние указания об объёме. "
         "ОБЯЗАТЕЛЬНО перепроверь длину поста перед ответом:\n"
         f"- Дай {n} коротких любопытных факта по теме "
@@ -158,9 +192,8 @@ def facts_rules(n: int) -> str:
         "- Каждый факт — 1-2 предложения, живо и понятно.\n"
         "- ОБЯЗАТЕЛЬНО заверши пост короткой остроумной ШУТКОЙ по теме "
         "(1-2 предложения) — это финал поста, он должен вызвать улыбку "
-        "и хорошее настроение на день.\n"
-        "- Тон: лёгкий, тёплый, утренний, чуть ироничный. "
-        "Такой пост хочется прочитать за утренним кофе.\n"
+        "и хорошее настроение.\n"
+        "- Тон: лёгкий, тёплый, чуть ироничный, приятный для чтения.\n"
         "- ОБЩИЙ ОБЪЁМ ПОСТА: 100-150 слов, НЕ БОЛЬШЕ.\n"
         "- НЕ пиши длинных абзацев, НЕ используй подзаголовки, "
         "НЕ делай развёрнутую статью."
@@ -171,12 +204,12 @@ def words_rule(words: int) -> str:
     """Вечер (19:00-20:30): вдумчивый лонг-рид на расслабление."""
     words = max(200, min(500, words))
     return (
-        "ЭТО ВЕЧЕРНИЙ ПОСТ. СТРОГО СОБЛЮДАЙ ФОРМАТ, "
+        "ЭТО ЛОНГ-РИД. СТРОГО СОБЛЮДАЙ ФОРМАТ, "
         "он ПОЛНОСТЬЮ ОТМЕНЯЕТ любые прежние указания об объёме. "
         "ОБЯЗАТЕЛЬНО перепроверь длину поста перед ответом:\n"
         f"- Объём: {words} слов (диапазон 200-500, НЕ БОЛЬШЕ 500).\n"
-        "- Формат: вдумчивый вечерний лонг-рид, который приятно "
-        "почитать для расслабления после рабочего дня.\n"
+        "- Формат: вдумчивый лонг-рид, который приятно "
+        "почитать для расслабления.\n"
         "- Структура: спокойное вступление, 1-2 смысловых блока, "
         "мягкий вывод.\n"
         "- Тон: неспешный, атмосферный, познавательный, без суеты."

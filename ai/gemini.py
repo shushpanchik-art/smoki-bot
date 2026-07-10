@@ -47,8 +47,17 @@ def _clients() -> list[tuple[str, genai.Client]]:
 
 
 def generate_text(prompt: str, *, temperature: float = 0.9,
-                  max_output_tokens: int = 8192) -> str:
-    """Генерация текста с автопереключением primary -> fallback."""
+                  max_output_tokens: int = 8192,
+                  use_search: bool = False) -> str:
+    """Генерация текста с автопереключением primary -> fallback.
+
+    use_search=True подключает Google Search grounding — модель опирается
+    на свежие материалы из интернета (актуальные новости/факты).
+    """
+    tools = (
+        [types.Tool(google_search=types.GoogleSearch())]
+        if use_search else None
+    )
     last_err: Exception | None = None
     for name, client in _clients():
         try:
@@ -58,6 +67,7 @@ def generate_text(prompt: str, *, temperature: float = 0.9,
                 config=types.GenerateContentConfig(
                     temperature=temperature,
                     max_output_tokens=max_output_tokens,
+                    tools=tools,
                 ),
             )
             if name == "fallback":

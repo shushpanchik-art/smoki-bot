@@ -196,3 +196,42 @@ async def append_setting(key: str, text: str, sep: str = "\n- ", limit: int = 40
     if len(combined) > limit:
         combined = combined[-limit:]
     await set_setting(key, combined)
+
+
+# ---------- статистика для админ-панели ----------
+async def get_stats() -> dict:
+    """Сводка для админ-панели: счётчики статей/тем/комментов/ИИ-вызовов."""
+    async with aiosqlite.connect(config.DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+
+        async def _one(sql: str, args: tuple = ()) -> int:
+            cur = await conn.execute(sql, args)
+            row = await cur.fetchone()
+            return int(row[0]) if row and row[0] is not None else 0
+
+        published = await _one(
+            "SELECT COUNT(*) FROM articles WHERE status = 'published'")
+        pending = await _one(
+            "SELECT COUNT(*) FROM articles WHERE status = 'pending'")
+        rejected = await _one(
+            "SELECT COUNT(*) FROM articles WHERE status = 'rejected'")
+        topics = await _one("SELECT COUNT(*) FROM published_topics")
+        comments = await _one("SELECT COUNT(*) FROM comments")
+        ai_calls = await _one("SELECT COUNT(*) FROM ai_logs")
+
+        cur = await conn.execute(
+            "SELECT published_at FROM articles "
+            "WHERE status = 'published' AND published_at IS NOT NULL "
+            "ORDER BY published_at DESC LIMIT 1")
+        row = await cur.fetchone()
+        last_published = row[0] if row and row[0] else None
+
+    return {
+        "published": published,
+        "pending": pending,
+        "rejected": rejected,
+        "topics": topics,
+        "comments": comments,
+        "ai_calls": ai_calls,
+        "last_published": last_published,
+    }

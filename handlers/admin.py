@@ -130,6 +130,135 @@ async def cmd_id(message: Message):
     )
 
 
+def _admin_kb() -> InlineKeyboardMarkup:
+    """Inline-меню админ-панели."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="\U0001F4DD Обычный", callback_data="adm_gen"),
+            InlineKeyboardButton(text="\u2600\ufe0f Утро", callback_data="adm_gen_m"),
+            InlineKeyboardButton(text="\U0001F319 Вечер", callback_data="adm_gen_e"),
+        ],
+        [
+            InlineKeyboardButton(text="\U0001F4CA Статистика", callback_data="adm_stats"),
+            InlineKeyboardButton(text="\U0001F4CF Длина постов", callback_data="adm_len"),
+        ],
+        [
+            InlineKeyboardButton(text="\U0001F49B Правила «нравится»", callback_data="adm_liked"),
+            InlineKeyboardButton(text="\U0001F6AB Правила цензуры", callback_data="adm_censor"),
+        ],
+    ])
+
+
+async def _cb_msg(cq: CallbackQuery) -> Message | None:
+    """Вернуть Message из callback, если доступен (не Inaccessible)."""
+    msg = cq.message
+    if isinstance(msg, Message):
+        return msg
+    return None
+
+
+async def _cb_guard(cq: CallbackQuery) -> bool:
+    """Проверка админа для callback; шлёт alert если нет прав."""
+    uid = cq.from_user.id if cq.from_user else 0
+    if not _is_admin_id(uid):
+        await cq.answer("Нет доступа.", show_alert=True)
+        return False
+    return True
+
+
+@router.callback_query(F.data == "adm_gen")
+async def cb_adm_gen(cq: CallbackQuery):
+    msg = await _cb_msg(cq)
+    if not await _cb_guard(cq) or msg is None:
+        return
+    await cq.answer()
+    await _do_generate(msg, _bot(cq), "")
+
+
+@router.callback_query(F.data == "adm_gen_m")
+async def cb_adm_gen_m(cq: CallbackQuery):
+    msg = await _cb_msg(cq)
+    if not await _cb_guard(cq) or msg is None:
+        return
+    await cq.answer()
+    await _do_generate(msg, _bot(cq), "morning")
+
+
+@router.callback_query(F.data == "adm_gen_e")
+async def cb_adm_gen_e(cq: CallbackQuery):
+    msg = await _cb_msg(cq)
+    if not await _cb_guard(cq) or msg is None:
+        return
+    await cq.answer()
+    await _do_generate(msg, _bot(cq), "evening")
+
+
+@router.callback_query(F.data == "adm_stats")
+async def cb_adm_stats(cq: CallbackQuery):
+    msg = await _cb_msg(cq)
+    if not await _cb_guard(cq) or msg is None:
+        return
+    await cq.answer()
+    s = await db.get_stats()
+    last = s.get("last_published") or "—"
+    text = (
+        "\U0001F4CA <b>Статистика</b>\n\n"
+        f"\U0001F4E2 Опубликовано: <b>{s['published']}</b>\n"
+        f"\u23F3 На модерации: <b>{s['pending']}</b>\n"
+        f"\u274C Отклонено: <b>{s['rejected']}</b>\n"
+        f"\U0001F5C2 Тем всего: <b>{s['topics']}</b>\n"
+        f"\U0001F4AC Комментариев: <b>{s['comments']}</b>\n"
+        f"\U0001F916 Вызовов ИИ: <b>{s['ai_calls']}</b>\n"
+        f"\U0001F553 Последняя публикация: <b>{last}</b>"
+    )
+    await msg.answer(text, parse_mode="HTML")
+
+
+@router.callback_query(F.data == "adm_len")
+async def cb_adm_len(cq: CallbackQuery):
+    msg = await _cb_msg(cq)
+    if not await _cb_guard(cq) or msg is None:
+        return
+    await cq.answer()
+    cur_m = await db.get_setting("morning_facts", str(config.MORNING_LEN_DEFAULT))
+    cur_e = await db.get_setting("evening_words", str(config.EVENING_WORDS_DEFAULT))
+    await msg.answer(
+        "\U0001F4CF <b>Длина постов</b>\n\n"
+        f"\u2022 утро (фактов): <b>{cur_m}</b>\n"
+        f"\u2022 вечер (слов): <b>{cur_e}</b>\n\n"
+        "Изменить:\n"
+        "<code>/setlen morning 2</code> (1-3)\n"
+        "<code>/setlen evening 400</code> (200-500)",
+        parse_mode="HTML",
+    )
+
+
+@router.callback_query(F.data == "adm_liked")
+async def cb_adm_liked(cq: CallbackQuery):
+    msg = await _cb_msg(cq)
+    if not await _cb_guard(cq) or msg is None:
+        return
+    await cq.answer()
+    val = await db.get_setting("liked_feedback") or "—"
+    await msg.answer(
+        f"\U0001F49B <b>Правила «нравится»</b>\n\n{val[:3500]}",
+        parse_mode="HTML",
+    )
+
+
+@router.callback_query(F.data == "adm_censor")
+async def cb_adm_censor(cq: CallbackQuery):
+    msg = await _cb_msg(cq)
+    if not await _cb_guard(cq) or msg is None:
+        return
+    await cq.answer()
+    val = await db.get_setting("censor_extra") or "—"
+    await msg.answer(
+        f"\U0001F6AB <b>Правила цензуры</b>\n\n{val[:3500]}",
+        parse_mode="HTML",
+    )
+
+
 def _main_kb() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -162,6 +291,8 @@ async def cmd_start(message: Message):
         "/id — показать id чата",
         reply_markup=_main_kb(),
     )
+    await message.answer("\U0001F6E0 <b>Админ-панель</b>", parse_mode="HTML",
+                         reply_markup=_admin_kb())
 
 
 async def _do_generate(message: Message, bot: Bot, fmt: str = ""):

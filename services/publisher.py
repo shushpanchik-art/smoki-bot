@@ -34,6 +34,23 @@ def _split(text: str, limit: int) -> list[str]:
     return parts or [text[:limit]]
 
 
+
+def _split_title_body(text: str) -> tuple[str, str]:
+    """Отделить первый абзац (заголовок) от остального тела.
+
+    Заголовок = первый непустой блок до первого двойного перевода строки.
+    Если заголовок слишком длинный для подписи — вернуть его как есть,
+    тело останется пустым (вызывающий код решит, как публиковать).
+    """
+    stripped = text.strip()
+    if not stripped:
+        return "", ""
+    parts = stripped.split("\n\n", 1)
+    title = parts[0].strip()
+    rest = parts[1].strip() if len(parts) > 1 else ""
+    return title, rest
+
+
 async def publish_article(bot: Bot, article_id: int) -> dict:
     """Опубликовать статью в канал. Возвращает {ok, message_id|error}."""
     art = await db.get_article(article_id)
@@ -47,21 +64,29 @@ async def publish_article(bot: Bot, article_id: int) -> dict:
 
     try:
         has_image = bool(image_path) and Path(str(image_path)).exists()
+        title, rest = _split_title_body(body)
+
         if has_image and len(body) <= TG_CAPTION_LIMIT:
-            # фото + весь текст в подписи
+            # короткий текст целиком помещается в подпись под фото
             msg = await bot.send_photo(
                 chat, FSInputFile(str(image_path)),
                 caption=body, parse_mode="HTML",
             )
             first_msg_id = msg.message_id
         elif has_image:
-            # фото отдельно, затем текст частями
-            msg = await bot.send_photo(chat, FSInputFile(str(image_path)))
+            # фото + заголовок в подписи, тело — отдельными сообщениями
+            caption = title if len(title) <= TG_CAPTION_LIMIT else title[:TG_CAPTION_LIMIT]
+            msg = await bot.send_photo(
+                chat, FSInputFile(str(image_path)),
+                caption=caption or None, parse_mode="HTML",
+            )
             first_msg_id = msg.message_id
-            for part in _split(body, TG_TEXT_LIMIT):
-                await bot.send_message(chat, part, parse_mode="HTML")
+            tail = rest if len(title) <= TG_CAPTION_LIMIT else body
+            for part in _split(tail, TG_TEXT_LIMIT):
+                if part.strip():
+                    await bot.send_message(chat, part, parse_mode="HTML")
         else:
-            # без картинки — только текст
+            # без картинки — только текст частями
             for i, part in enumerate(_split(body, TG_TEXT_LIMIT)):
                 msg = await bot.send_message(chat, part, parse_mode="HTML")
                 if i == 0:

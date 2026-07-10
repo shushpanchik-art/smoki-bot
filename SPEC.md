@@ -17,7 +17,6 @@ venv/bin/ruff check . --exclude venv,data,__pycache__
 
 Это ловит ошибки (F541, неиспользуемые импорты и т.п.) до GitHub Actions и экономит запуски CI. Версии ruff/mypy в venv обязаны совпадать с CI: ruff==0.15.12, mypy==1.14.1.
 
-
 ## Smoke-тесты vs pytest
 
 Ручной smoke (`python -c "asyncio.run(...)"`) — разовая проверка при разработке,

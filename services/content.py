@@ -1,5 +1,6 @@
 """Генерация контента: тема → статья → автоцензура → картинка."""
 import asyncio
+import datetime
 import logging
 import re
 import time
@@ -96,6 +97,24 @@ async def _accumulated_rules(extra: str | None = None) -> str | None:
     return "\n\n".join(parts) if parts else None
 
 
+
+async def _default_length_hint() -> str:
+    """Выбор формата по текущему времени: утро→факты, иначе→лонг-рид.
+
+    Источник длины ВСЕГДА бот, ИИ длину не выбирает.
+    """
+    hour = datetime.datetime.now().hour
+    if config.MORNING_START <= hour < config.MORNING_END:
+        n = int(await db.get_setting(
+            "morning_facts", str(config.MORNING_LEN_DEFAULT))
+            or config.MORNING_LEN_DEFAULT)
+        return prompts.facts_rules(n)
+    w = int(await db.get_setting(
+        "evening_words", str(config.EVENING_WORDS_DEFAULT))
+        or config.EVENING_WORDS_DEFAULT)
+    return prompts.words_rule(w)
+
+
 async def generate_article(topic: str | None = None,
                            extra_rules: str | None = None,
                            length_hint: str | None = None,
@@ -107,6 +126,8 @@ async def generate_article(topic: str | None = None,
     if not topic:
         topic = await generate_topic()
     logger.info("Генерация статьи по теме: %s", topic)
+    if length_hint is None:
+        length_hint = await _default_length_hint()
 
     used = await db.get_used_topics()
     rules = await _accumulated_rules(extra_rules)
@@ -136,7 +157,8 @@ async def generate_article(topic: str | None = None,
     topic_id = await db.add_topic(topic, category="article", status="draft")
     article_id = await db.add_article(topic_id, body,
                                       image_path=image_path,
-                                      image_prompt=img_prompt)
+                                      image_prompt=img_prompt,
+                                      length_hint=length_hint)
     logger.info("Статья #%s создана (topic #%s, image=%s)",
                 article_id, topic_id, bool(image_path))
     return {

@@ -325,8 +325,10 @@ async def fb_regen(message: Message, bot: Bot, state: FSMContext):
     if extra:
         await db.update_article(aid, admin_feedback=extra)
     await message.answer("🔄 Генерирую заново…")
+    old_hint = await db.get_article_length_hint(aid)
     try:
-        res = await content.generate_article(extra_rules=extra)
+        res = await content.generate_article(
+            extra_rules=extra, length_hint=old_hint)
     except Exception as e:
         logger.exception("regen")
         await message.answer(f"❌ Ошибка регена: {e}")
@@ -354,8 +356,10 @@ async def fb_reject(message: Message, bot: Bot, state: FSMContext):
         await db.append_setting("censor_extra", fb)
         extra = fb
     await message.answer("❌ Отклонено. 🔄 Генерирую заново с учётом замечаний…")
+    old_hint = await db.get_article_length_hint(aid)
     try:
-        res = await content.generate_article(extra_rules=extra)
+        res = await content.generate_article(
+            extra_rules=extra, length_hint=old_hint)
     except Exception as e:
         logger.exception("reject-regen")
         await message.answer(f"❌ Ошибка регена: {e}")

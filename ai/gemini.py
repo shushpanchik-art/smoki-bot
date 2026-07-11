@@ -4,12 +4,16 @@
 переключаемся на резервный клиент AI Studio с ключом GEMINI_API_KEY_FALLBACK.
 """
 import logging
+from typing import TYPE_CHECKING
 
 import config  # noqa: F401  — выполняет load_dotenv() до создания клиента
 from google import genai
 from google.genai import types
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from PIL.Image import Image as PILImage
 
 _client: genai.Client | None = None
 _fallback: genai.Client | None = None
@@ -81,18 +85,46 @@ def generate_text(prompt: str, *, temperature: float = 0.9,
     return ""
 
 
+def _trim_borders(img: "PILImage", tol: int = 12) -> "PILImage":
+    """Срезает однотонные (белые/чёрные) поля по краям картинки.
+
+    Берём цвет угла как фон, строим разницу, ищем bbox реального контента.
+    Если фон не найден или bbox пустой — возвращаем исходник без изменений.
+    """
+    from PIL import Image, ImageChops
+
+    rgb = img.convert("RGB")
+    w, h = rgb.size
+    # предполагаемый цвет фона = левый верхний пиксель
+    bg = Image.new("RGB", rgb.size, rgb.getpixel((0, 0)))
+    diff = ImageChops.difference(rgb, bg)
+    # усиливаем разницу, чтобы отсечь шум сжатия по порогу tol
+    diff = diff.point(lambda x: 255 if x > tol else 0)
+    bbox = diff.getbbox()
+    if not bbox:
+        return img
+    left, top, right, bottom = bbox
+    # игнорируем микрообрезку (<2% с каждой стороны) — не трогаем контент зря
+    trimmed = (left + (w - right)) + (top + (h - bottom))
+    if trimmed < (w + h) * 0.02:
+        return img
+    return img.crop(bbox)
+
+
 def _crop_landscape(data: bytes, ratio: float = 3 / 2) -> bytes:
     """Центральный кроп PNG под горизонтальный формат (по умолчанию 3:2).
 
     flash-image всегда отдаёт квадрат 1024x1024; SDK не умеет aspect_ratio,
-    поэтому режем сами. Ошибки не критичны — возвращаем исходник.
+    поэтому режем сами. Сначала срезаем однотонные поля (white/black bars),
+    затем приводим к нужному соотношению. Ошибки не критичны — отдаём исходник.
     """
     try:
         import io
 
         from PIL import Image
 
-        src = Image.open(io.BytesIO(data))
+        opened = Image.open(io.BytesIO(data))
+        src = _trim_borders(opened)
         w, h = src.size
         if w <= 0 or h <= 0:
             return data

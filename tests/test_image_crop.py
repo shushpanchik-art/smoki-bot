@@ -42,3 +42,22 @@ def test_custom_ratio():
     w, h = _size(out)
     assert w == 1000
     assert abs(w / h - 16 / 9) < 0.02
+
+
+def test_trim_removes_white_bars():
+    from ai.gemini import _trim_borders
+
+    img = Image.new("RGB", (1024, 1024), (255, 255, 255))
+    for y in range(200, 824):
+        for x in range(1024):
+            img.putpixel((x, y), (10, 120, 60))
+    assert _trim_borders(img).size[1] < 1024
+
+
+def test_trim_keeps_full_when_no_bars():
+    from ai.gemini import _trim_borders
+
+    img = Image.new("RGB", (600, 400), (30, 30, 30))
+    for x in range(600):
+        img.putpixel((x, 0), (200, 10, 10))
+    assert _trim_borders(img).size == (600, 400)

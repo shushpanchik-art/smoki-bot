@@ -1,14 +1,12 @@
 import asyncio
 import logging
-from pathlib import Path
 
 from aiogram import Router, F, Bot
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
-    Message, CallbackQuery, FSInputFile,
-    InlineKeyboardMarkup, InlineKeyboardButton,
+    Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton,
     ReplyKeyboardRemove,
 )
 
@@ -79,7 +77,6 @@ def _kb(article_id: int) -> InlineKeyboardMarkup:
     ])
 
 
-CAPTION_LIMIT = 1024
 
 
 async def send_for_moderation(bot: Bot, article_id: int):
@@ -93,37 +90,10 @@ async def send_for_moderation(bot: Bot, article_id: int):
     header = f"📝 <b>Черновик #{article_id}</b>\n\n"
     kb = _kb(article_id)
 
-    has_img = bool(image_path) and Path(str(image_path)).exists()
-    full = header + body
-
-    async def _send_text_with_kb():
-        parts = publisher._split(body, 4000)
-        for i, part in enumerate(parts):
-            prefix = header if i == 0 else ""
-            last = i == len(parts) - 1
-            await bot.send_message(
-                config.ADMIN_CHAT_ID, prefix + part,
-                reply_markup=kb if last else None,
-            )
-
-    if has_img and len(full) <= CAPTION_LIMIT:
-        try:
-            await bot.send_photo(
-                config.ADMIN_CHAT_ID, FSInputFile(str(image_path)),
-                caption=full, reply_markup=kb,
-            )
-        except Exception:
-            logger.exception("send_for_moderation: фото+caption #%s", article_id)
-            await bot.send_message(config.ADMIN_CHAT_ID, full, reply_markup=kb)
-    else:
-        if has_img:
-            try:
-                await bot.send_photo(
-                    config.ADMIN_CHAT_ID, FSInputFile(str(image_path)),
-                )
-            except Exception:
-                logger.exception("send_for_moderation: фото #%s", article_id)
-        await _send_text_with_kb()
+    await publisher.send_photo_with_text(
+        bot, config.ADMIN_CHAT_ID, image_path, body,
+        header=header, reply_markup=kb,
+    )
 
 
 # ---------- команды ----------

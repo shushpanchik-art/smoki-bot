@@ -35,22 +35,6 @@ def _split(text: str, limit: int) -> list[str]:
 
 
 
-def _split_title_body(text: str) -> tuple[str, str]:
-    """Отделить первый абзац (заголовок) от остального тела.
-
-    Заголовок = первый непустой блок до первого двойного перевода строки.
-    Если заголовок слишком длинный для подписи — вернуть его как есть,
-    тело останется пустым (вызывающий код решит, как публиковать).
-    """
-    stripped = text.strip()
-    if not stripped:
-        return "", ""
-    parts = stripped.split("\n\n", 1)
-    title = parts[0].strip()
-    rest = parts[1].strip() if len(parts) > 1 else ""
-    return title, rest
-
-
 async def publish_article(bot: Bot, article_id: int) -> dict:
     """Опубликовать статью в канал. Возвращает {ok, message_id|error}."""
     art = await db.get_article(article_id)
@@ -63,34 +47,9 @@ async def publish_article(bot: Bot, article_id: int) -> dict:
     first_msg_id = None
 
     try:
-        has_image = bool(image_path) and Path(str(image_path)).exists()
-        title, rest = _split_title_body(body)
-
-        if has_image and len(body) <= TG_CAPTION_LIMIT:
-            # короткий текст целиком помещается в подпись под фото
-            msg = await bot.send_photo(
-                chat, FSInputFile(str(image_path)),
-                caption=body, parse_mode="HTML",
-            )
-            first_msg_id = msg.message_id
-        elif has_image:
-            # фото + заголовок в подписи, тело — отдельными сообщениями
-            caption = title if len(title) <= TG_CAPTION_LIMIT else title[:TG_CAPTION_LIMIT]
-            msg = await bot.send_photo(
-                chat, FSInputFile(str(image_path)),
-                caption=caption or None, parse_mode="HTML",
-            )
-            first_msg_id = msg.message_id
-            tail = rest if len(title) <= TG_CAPTION_LIMIT else body
-            for part in _split(tail, TG_TEXT_LIMIT):
-                if part.strip():
-                    await bot.send_message(chat, part, parse_mode="HTML")
-        else:
-            # без картинки — только текст частями
-            for i, part in enumerate(_split(body, TG_TEXT_LIMIT)):
-                msg = await bot.send_message(chat, part, parse_mode="HTML")
-                if i == 0:
-                    first_msg_id = msg.message_id
+        first_msg_id = await send_photo_with_text(
+            bot, chat, image_path, body,
+        )
     except Exception as e:
         logger.exception("Ошибка публикации статьи #%s", article_id)
         return {"ok": False, "error": str(e)}
@@ -118,3 +77,86 @@ async def _mark_published_time(article_id: int):
             (article_id,),
         )
         await conn.commit()
+
+
+def _caption_split(text: str, limit: int = TG_CAPTION_LIMIT) -> tuple[str, str]:
+    """Отделить кусок для caption (<=limit, по границе абзаца) и остаток.
+
+    Caption = как можно больше текста, но не длиннее limit и по возможности
+    заканчивается на границе абзаца (\\n\\n). Если первый абзац сам длиннее
+    limit — жёсткая обрезка по limit. Возвращает (caption, tail).
+    """
+    text = (text or "").strip()
+    if not text:
+        return "", ""
+    if len(text) <= limit:
+        return text, ""
+    paras = text.split("\n\n")
+    cap = ""
+    for i, para in enumerate(paras):
+        cand = (cap + "\n\n" + para).strip() if cap else para
+        if len(cand) <= limit:
+            cap = cand
+        else:
+            break
+    if cap:
+        tail = text[len(cap):].strip()
+        return cap, tail
+    # первый абзац длиннее лимита — жёсткая обрезка
+    return text[:limit], text[limit:].strip()
+
+
+async def send_photo_with_text(
+    bot: Bot,
+    chat_id: int | str,
+    image_path: str | None,
+    text: str,
+    header: str = "",
+    reply_markup=None,
+):
+    """Отправить фото с максимумом текста в подписи, остаток — сообщениями.
+
+    header (напр. "Черновик #12") идёт в начало подписи/первого сообщения.
+    Кнопки reply_markup вешаются на ПОСЛЕДНЕЕ сообщение.
+    Возвращает message_id первого сообщения (или None).
+    """
+    has_img = bool(image_path) and Path(str(image_path)).exists()
+    full = (header + text) if header else text
+    first_id = None
+
+    if has_img:
+        cap, tail = _caption_split(full, TG_CAPTION_LIMIT)
+        try:
+            msg = await bot.send_photo(
+                chat_id, FSInputFile(str(image_path)),
+                caption=cap or None, parse_mode="HTML",
+                reply_markup=reply_markup if not tail else None,
+            )
+            first_id = msg.message_id
+        except Exception:
+            logger.exception("send_photo_with_text: фото не отправилось")
+            has_img = False
+            tail = full  # весь текст пойдёт сообщениями
+        if has_img and tail:
+            parts = _split(tail, TG_TEXT_LIMIT)
+            for i, part in enumerate(parts):
+                if not part.strip():
+                    continue
+                last = i == len(parts) - 1
+                await bot.send_message(
+                    chat_id, part, parse_mode="HTML",
+                    reply_markup=reply_markup if last else None,
+                )
+        return first_id
+
+    # без фото — только текст частями
+    parts = _split(full, TG_TEXT_LIMIT)
+    for i, part in enumerate(parts):
+        last = i == len(parts) - 1
+        msg = await bot.send_message(
+            chat_id, part, parse_mode="HTML",
+            reply_markup=reply_markup if last else None,
+        )
+        if i == 0:
+            first_id = msg.message_id
+    return first_id

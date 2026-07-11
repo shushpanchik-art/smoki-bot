@@ -124,9 +124,9 @@ main защищён, только через PR с зелёным CI. .env.examp
 ## Синхронизация по коду (сверка тел функций handlers/admin.py)
 
 > Реализовано и работает: генерация из кнопок (adm_gen/adm_gen_m/adm_gen_e →
-> _do_generate), FSM модерации (pub/pubfb/regen/rej/cancel + 3 waiting_*fb),
+> \_do_generate), FSM модерации (pub/pubfb/regen/rej/cancel + 3 waiting_*fb),
 > команды /generate /generate_morning /generate_evening /setlen /id /start.
-> Инлайн-панель _admin_kb: Обычный/Утро/Вечер/Статистика/Длина/Нравится/Цензура.
+> Инлайн-панель \_admin_kb: Обычный/Утро/Вечер/Статистика/Длина/Нравится/Цензура.
 
 - [x] #9 Кнопки «Обычный/Утро/Вечер» ЗАПУСКАЮТ генерацию (cb_adm_gen*). Работает.
 

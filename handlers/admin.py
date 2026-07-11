@@ -9,6 +9,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
     Message, CallbackQuery, FSInputFile,
     InlineKeyboardMarkup, InlineKeyboardButton,
+    ReplyKeyboardRemove,
 )
 
 import config
@@ -137,16 +138,22 @@ def _admin_kb() -> InlineKeyboardMarkup:
     """Inline-меню админ-панели."""
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="\U0001F4DD Обычный", callback_data="adm_gen"),
-            InlineKeyboardButton(text="\u2600\ufe0f Утро", callback_data="adm_gen_m"),
-            InlineKeyboardButton(text="\U0001F319 Вечер", callback_data="adm_gen_e"),
+            InlineKeyboardButton(text="\U0001F4DD Обычный пост", callback_data="adm_gen"),
+        ],
+        [
+            InlineKeyboardButton(text="\u2600\ufe0f Утренний", callback_data="adm_gen_m"),
+            InlineKeyboardButton(text="\U0001F319 Вечерний", callback_data="adm_gen_e"),
         ],
         [
             InlineKeyboardButton(text="\U0001F4CA Статистика", callback_data="adm_stats"),
+        ],
+        [
             InlineKeyboardButton(text="\U0001F4CF Длина постов", callback_data="adm_len"),
         ],
         [
             InlineKeyboardButton(text="\U0001F49B Правила «нравится»", callback_data="adm_liked"),
+        ],
+        [
             InlineKeyboardButton(text="\U0001F6AB Правила цензуры", callback_data="adm_censor"),
         ],
         [
@@ -291,9 +298,25 @@ async def cb_adm_backup(cq: CallbackQuery):
     if msg is None:
         return
     if rc == 0:
+        # служба сработала — читаем реальный итог из journald
+        report = ""
+        try:
+            jp = await asyncio.create_subprocess_exec(
+                "journalctl", "-u", "smoki-backup.service",
+                "-n", "6", "--no-pager", "-o", "cat",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            jout, _ = await asyncio.wait_for(jp.communicate(), timeout=15)
+            report = (jout or b"").decode(errors="replace").strip()
+        except Exception:
+            logger.exception("adm_backup: journalctl failed")
+        lines = [ln for ln in report.splitlines()
+                 if "backup ok" in ln or "stats:" in ln]
+        tail = "\n".join(lines) or report[-500:] or "(нет данных в логе)"
         await msg.answer(
-            "\u2705 Внеочередной бэкап запущен.\n"
-            "Отчёт придёт отдельным сообщением от службы бэкапа."
+            "\u2705 <b>Бэкап выполнен.</b>\n<pre>" + tail + "</pre>",
+            parse_mode="HTML",
         )
     else:
         tail = (out or b"").decode(errors="replace")[-500:]
@@ -318,10 +341,14 @@ async def cmd_start(message: Message):
             "Если ты администратор — впиши этот id в ADMIN_CHAT_ID (.env)."
         )
         return
+    # убрать старую reply-клавиатуру под строкой ввода (если осталась)
     await message.answer(
-        "\U0001F6E0 <b>SMOKI — админ-панель</b>\n"
-        "Управление через кнопки ниже.",
+        "\U0001F6E0 <b>SMOKI — админ-панель</b>",
         parse_mode="HTML",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+    await message.answer(
+        "Управление через кнопки ниже:",
         reply_markup=_admin_kb(),
     )
 

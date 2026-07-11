@@ -138,6 +138,7 @@ def image_prompt(topic: str) -> str:
         "no signage, no typography, no writing. Book spines and labels "
         "must be blank or blurred with no readable characters. "
         "This is a purely visual wordless photographic illustration. "
+        "Wide horizontal landscape orientation, 3:2 aspect ratio (clearly wider than tall). "
         "High-quality editorial illustration for an article "
         f"about: {topic}. Theme: smoking culture (vapes, hookah, tobacco). "
         f"Composition: {scene}. Colour palette: {palette}. "

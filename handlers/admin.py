@@ -27,6 +27,8 @@ class ModerationStates(StatesGroup):
     waiting_publish_fb = State()
     waiting_regen_fb = State()
     waiting_reject_fb = State()
+    waiting_liked_edit = State()
+    waiting_censor_edit = State()
 
 
 def _is_admin_id(uid: int) -> bool:
@@ -253,9 +255,13 @@ async def cb_adm_liked(cq: CallbackQuery):
         return
     await cq.answer()
     val = await db.get_setting("liked_feedback") or "—"
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="\u270F\uFE0F Изменить", callback_data="adm_liked_edit"),
+    ]])
     await msg.answer(
         f"\U0001F49B <b>Правила «нравится»</b>\n\n{val[:3500]}",
         parse_mode="HTML",
+        reply_markup=kb,
     )
 
 
@@ -266,9 +272,13 @@ async def cb_adm_censor(cq: CallbackQuery):
         return
     await cq.answer()
     val = await db.get_setting("censor_extra") or "—"
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="\u270F\uFE0F Изменить", callback_data="adm_censor_edit"),
+    ]])
     await msg.answer(
         f"\U0001F6AB <b>Правила цензуры</b>\n\n{val[:3500]}",
         parse_mode="HTML",
+        reply_markup=kb,
     )
 
 @router.callback_query(F.data == "adm_backup")
@@ -550,6 +560,58 @@ async def cb_cancel(cq: CallbackQuery, state: FSMContext):
         config.ADMIN_CHAT_ID,
         f"⛔ Статья #{aid} снята с публикации. Ничего не отправлено.",
     )
+
+
+# ---------- редактирование правил через панель (P2 #7/#8) ----------
+async def _ask_rule_edit(cq: CallbackQuery, state: FSMContext,
+                         st: State, label: str) -> None:
+    if not await _cb_guard(cq):
+        return
+    if await state.get_state() is not None:
+        await cq.answer("Сначала закончи текущее действие или ⛔ Отмена",
+                        show_alert=True)
+        return
+    await state.set_state(st)
+    await cq.answer()
+    await _clear_markup(cq)
+    await _bot(cq).send_message(
+        config.ADMIN_CHAT_ID,
+        f"\u270F\uFE0F Пришли новый текст правил ({label}). "
+        "Он ПОЛНОСТЬЮ заменит старый. "
+        "Или <code>-</code>, чтобы очистить.",
+    )
+
+
+@router.callback_query(F.data == "adm_liked_edit")
+async def cb_adm_liked_edit(cq: CallbackQuery, state: FSMContext):
+    await _ask_rule_edit(cq, state,
+                         ModerationStates.waiting_liked_edit, "нравится")
+
+
+@router.callback_query(F.data == "adm_censor_edit")
+async def cb_adm_censor_edit(cq: CallbackQuery, state: FSMContext):
+    await _ask_rule_edit(cq, state,
+                         ModerationStates.waiting_censor_edit, "цензура")
+
+
+@router.message(ModerationStates.waiting_liked_edit)
+async def fb_liked_edit(message: Message, state: FSMContext):
+    if not _is_admin(message):
+        return
+    await state.clear()
+    val = "" if _is_skip(message.text) else (message.text or "")
+    await db.set_setting("liked_feedback", val)
+    await message.answer("\u2705 Правила «нравится» обновлены.")
+
+
+@router.message(ModerationStates.waiting_censor_edit)
+async def fb_censor_edit(message: Message, state: FSMContext):
+    if not _is_admin(message):
+        return
+    await state.clear()
+    val = "" if _is_skip(message.text) else (message.text or "")
+    await db.set_setting("censor_extra", val)
+    await message.answer("\u2705 Правила цензуры обновлены.")
 
 
 # ---------- модерация: приём текстового фидбэка ----------

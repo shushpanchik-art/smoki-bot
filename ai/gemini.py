@@ -81,6 +81,38 @@ def generate_text(prompt: str, *, temperature: float = 0.9,
     return ""
 
 
+def _crop_landscape(data: bytes, ratio: float = 3 / 2) -> bytes:
+    """Центральный кроп PNG под горизонтальный формат (по умолчанию 3:2).
+
+    flash-image всегда отдаёт квадрат 1024x1024; SDK не умеет aspect_ratio,
+    поэтому режем сами. Ошибки не критичны — возвращаем исходник.
+    """
+    try:
+        import io
+
+        from PIL import Image
+
+        src = Image.open(io.BytesIO(data))
+        w, h = src.size
+        if w <= 0 or h <= 0:
+            return data
+        target = w / ratio  # желаемая высота при полной ширине
+        if target <= h:
+            new_h = int(round(target))
+            top = (h - new_h) // 2
+            cropped = src.crop((0, top, w, top + new_h))
+        else:
+            new_w = int(round(h * ratio))
+            left = (w - new_w) // 2
+            cropped = src.crop((left, 0, left + new_w, h))
+        buf = io.BytesIO()
+        cropped.save(buf, format="PNG")
+        return buf.getvalue()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("_crop_landscape не удался, отдаю оригинал: %s", e)
+        return data
+
+
 def generate_image(prompt: str) -> bytes | None:
     """Генерация картинки с автопереключением primary -> fallback."""
     last_err: Exception | None = None
@@ -98,7 +130,7 @@ def generate_image(prompt: str) -> bytes | None:
                 if inline and inline.data:
                     if name == "fallback":
                         logger.warning("generate_image: использован резервный ключ")
-                    return inline.data
+                    return _crop_landscape(inline.data)
             logger.warning("Картинка не сгенерирована (%s): %.80s", name, prompt)
         except Exception as e:  # noqa: BLE001
             last_err = e

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from pathlib import Path
 
@@ -8,7 +9,6 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
     Message, CallbackQuery, FSInputFile,
     InlineKeyboardMarkup, InlineKeyboardButton,
-    ReplyKeyboardMarkup, KeyboardButton,
 )
 
 import config
@@ -149,6 +149,9 @@ def _admin_kb() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="\U0001F49B Правила «нравится»", callback_data="adm_liked"),
             InlineKeyboardButton(text="\U0001F6AB Правила цензуры", callback_data="adm_censor"),
         ],
+        [
+            InlineKeyboardButton(text="\U0001F4BE Сделать бэкап", callback_data="adm_backup"),
+        ],
     ])
 
 
@@ -261,16 +264,47 @@ async def cb_adm_censor(cq: CallbackQuery):
         parse_mode="HTML",
     )
 
+@router.callback_query(F.data == "adm_backup")
+async def cb_adm_backup(cq: CallbackQuery):
+    if not await _cb_guard(cq):
+        return
+    await cq.answer("Запускаю бэкап…")
+    msg = await _cb_msg(cq)
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "systemctl", "start", "smoki-backup.service",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        out, _ = await asyncio.wait_for(proc.communicate(), timeout=60)
+        rc = proc.returncode
+    except asyncio.TimeoutError:
+        logger.error("adm_backup: timeout")
+        if msg is not None:
+            await msg.answer("\u26A0\ufe0f Бэкап не ответил за 60с. Проверь логи.")
+        return
+    except Exception:
+        logger.exception("adm_backup: subprocess failed")
+        if msg is not None:
+            await msg.answer("\u274C Не удалось запустить бэкап (см. логи).")
+        return
+    if msg is None:
+        return
+    if rc == 0:
+        await msg.answer(
+            "\u2705 Внеочередной бэкап запущен.\n"
+            "Отчёт придёт отдельным сообщением от службы бэкапа."
+        )
+    else:
+        tail = (out or b"").decode(errors="replace")[-500:]
+        await msg.answer(
+            f"\u274C Бэкап завершился с ошибкой (rc={rc}).\n"
+            f"<pre>{tail}</pre>",
+            parse_mode="HTML",
+        )
 
-def _main_kb() -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="/generate"), KeyboardButton(text="/setlen")],
-            [KeyboardButton(text="/generate_morning"),
-             KeyboardButton(text="/generate_evening")],
-        ],
-        resize_keyboard=True,
-    )
+
+
 
 
 @router.message(Command("start"))
@@ -285,17 +319,11 @@ async def cmd_start(message: Message):
         )
         return
     await message.answer(
-        "👋 SMOKI content bot готов.\n\n"
-        "Команды:\n"
-        "/generate — черновик поста (обычный)\n"
-        "/generate_morning — утренний формат (факты)\n"
-        "/generate_evening — вечерний лонг-рид\n"
-        "/setlen — показать/изменить желаемую длину постов\n"
-        "/id — показать id чата",
-        reply_markup=_main_kb(),
+        "\U0001F6E0 <b>SMOKI — админ-панель</b>\n"
+        "Управление через кнопки ниже.",
+        parse_mode="HTML",
+        reply_markup=_admin_kb(),
     )
-    await message.answer("\U0001F6E0 <b>Админ-панель</b>", parse_mode="HTML",
-                         reply_markup=_admin_kb())
 
 
 async def _do_generate(message: Message, bot: Bot, fmt: str = ""):

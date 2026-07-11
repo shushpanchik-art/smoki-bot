@@ -98,3 +98,104 @@ async def test_clear_markup_swallows_error():
     cq = SimpleNamespace(message=msg)
     await admin._clear_markup(cq)  # исключение проглатывается
     msg.edit_reply_markup.assert_awaited_once()
+
+
+# --- cb_adm_backup: запуск бэкапа + чтение отчёта из journald ---
+
+class _FakeProc:
+    """Мок asyncio-процесса: заданные stdout и returncode."""
+    def __init__(self, out: bytes, rc: int):
+        self._out = out
+        self.returncode = rc
+
+    async def communicate(self):
+        return self._out, b""
+
+
+async def test_cb_adm_backup_success(monkeypatch):
+    """rc=0: бот читает journald и присылает отчёт с итогом бэкапа."""
+    calls = []
+
+    async def fake_exec(*args, **kwargs):
+        calls.append(args)
+        # первый вызов — systemctl start (rc=0),
+        # второй — journalctl (отдаёт лог со stats/backup ok)
+        if args[0] == "systemctl":
+            return _FakeProc(b"", 0)
+        return _FakeProc(b"backup ok: smoki-20240101.tar.gz\nstats: files=3, total_size=1024B\n", 0)
+
+    monkeypatch.setattr(admin.asyncio, "create_subprocess_exec", fake_exec)
+
+    async def ok_guard(cq):
+        return True
+    monkeypatch.setattr(admin, "_cb_guard", ok_guard)
+
+    msg = MagicMock()
+    msg.answer = AsyncMock()
+
+    async def fake_msg(cq):
+        return msg
+    monkeypatch.setattr(admin, "_cb_msg", fake_msg)
+
+    cq = MagicMock()
+    cq.answer = AsyncMock()
+
+    await admin.cb_adm_backup(cq)
+
+    msg.answer.assert_awaited()
+    sent = msg.answer.await_args.args[0]
+    assert "Бэкап выполнен" in sent
+    assert "backup ok" in sent or "stats" in sent
+    # systemctl start вызывался
+    assert any(c[0] == "systemctl" for c in calls)
+    # journalctl тоже вызывался (чтение отчёта)
+    assert any(c[0] == "journalctl" for c in calls)
+
+
+async def test_cb_adm_backup_error(monkeypatch):
+    """rc!=0: бот присылает сообщение об ошибке с кодом возврата."""
+    async def fake_exec(*args, **kwargs):
+        return _FakeProc(b"unit failed\n", 1)
+    monkeypatch.setattr(admin.asyncio, "create_subprocess_exec", fake_exec)
+
+    async def ok_guard(cq):
+        return True
+    monkeypatch.setattr(admin, "_cb_guard", ok_guard)
+
+    msg = MagicMock()
+    msg.answer = AsyncMock()
+
+    async def fake_msg(cq):
+        return msg
+    monkeypatch.setattr(admin, "_cb_msg", fake_msg)
+
+    cq = MagicMock()
+    cq.answer = AsyncMock()
+
+    await admin.cb_adm_backup(cq)
+
+    msg.answer.assert_awaited()
+    sent = msg.answer.await_args.args[0]
+    assert "ошибк" in sent.lower()
+    assert "rc=1" in sent
+
+
+async def test_cb_adm_backup_denied(monkeypatch):
+    """Не-админ: guard возвращает False, бэкап не запускается."""
+    started = []
+
+    async def fake_exec(*args, **kwargs):
+        started.append(args)
+        return _FakeProc(b"", 0)
+    monkeypatch.setattr(admin.asyncio, "create_subprocess_exec", fake_exec)
+
+    async def deny_guard(cq):
+        return False
+    monkeypatch.setattr(admin, "_cb_guard", deny_guard)
+
+    cq = MagicMock()
+    cq.answer = AsyncMock()
+
+    await admin.cb_adm_backup(cq)
+
+    assert started == []  # процесс не запускался

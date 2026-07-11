@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import random
 
 from aiogram import Router, F, Bot
 from aiogram.filters import Command
@@ -336,9 +337,10 @@ async def cmd_start(message: Message):
 async def _do_generate(message: Message, bot: Bot, fmt: str = ""):
     length_hint = None
     if fmt == "morning":
-        n = int(await db.get_setting(
+        n_max = int(await db.get_setting(
             "morning_facts", str(config.MORNING_LEN_DEFAULT))
             or config.MORNING_LEN_DEFAULT)
+        n = random.randint(1, max(1, n_max))
         length_hint = prompts.facts_rules(n)
         await message.answer(f"⏳ Утренний формат ({n} факт(ов))…")
     elif fmt == "evening":

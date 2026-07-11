@@ -1,6 +1,7 @@
 """Генерация контента: тема → статья → автоцензура → картинка."""
 import asyncio
 import datetime
+import random
 import logging
 import re
 import time
@@ -120,9 +121,10 @@ async def _default_length_hint() -> str:
     """
     hour = datetime.datetime.now().hour
     if config.MORNING_START <= hour < config.MORNING_END:
-        n = int(await db.get_setting(
+        n_max = int(await db.get_setting(
             "morning_facts", str(config.MORNING_LEN_DEFAULT))
             or config.MORNING_LEN_DEFAULT)
+        n = random.randint(1, max(1, n_max))
         return prompts.facts_rules(n)
     w = int(await db.get_setting(
         "evening_words", str(config.EVENING_WORDS_DEFAULT))

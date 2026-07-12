@@ -107,6 +107,8 @@ log "stats: remote history files = $REMOTE_FILES (retention=${OFFSITE_RETENTION_
 trap - ERR
 if [ -x "$NOTIFY_SCRIPT" ]; then
     "$NOTIFY_SCRIPT" offsite-recovered || log "WARN: notify_admin.sh offsite-recovered упал (rc=$?)"
+    # Ежедневное подтверждение успеха (анти-дубликат в notify_admin.sh: не чаще 1 раза в 20ч)
+    "$NOTIFY_SCRIPT" backup-ok || log "WARN: notify_admin.sh backup-ok упал (rc=$?)"
 fi
 log "OK: offsite backup complete"
 exit 0

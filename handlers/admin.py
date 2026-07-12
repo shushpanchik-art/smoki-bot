@@ -181,12 +181,29 @@ async def _cb_guard(cq: CallbackQuery) -> bool:
 
 
 @router.callback_query(F.data == "adm_gen")
-async def cb_adm_gen(cq: CallbackQuery):
+async def cb_adm_gen(cq: CallbackQuery, state: FSMContext):
     msg = await _cb_msg(cq)
     if not await _cb_guard(cq) or msg is None:
         return
+    if await state.get_state() is not None:
+        await cq.answer("Заверши текущее действие", show_alert=True)
+        return
     await cq.answer()
-    await _do_generate(msg, _bot(cq), "")
+    await state.set_state(ModerationStates.waiting_custom_topic)
+    await msg.answer(
+        "\U0001F4DD Напиши тему поста. Или отправь <code>-</code> — "
+        "выберу случайную сам."
+    )
+
+
+@router.message(ModerationStates.waiting_custom_topic)
+async def fb_custom_topic(message: Message, bot: Bot, state: FSMContext):
+    if not _is_admin(message):
+        return
+    await state.clear()
+    raw = (message.text or "").strip()
+    topic = None if raw in ("", "-") else raw
+    await _do_generate(message, bot, "", topic=topic)
 
 
 @router.callback_query(F.data == "adm_gen_m")
@@ -429,7 +446,8 @@ async def cmd_start(message: Message):
     )
 
 
-async def _do_generate(message: Message, bot: Bot, fmt: str = ""):
+async def _do_generate(message: Message, bot: Bot, fmt: str = "",
+                       topic: str | None = None):
     length_hint = None
     if fmt == "morning":
         n_max = int(await db.get_setting(
@@ -447,7 +465,7 @@ async def _do_generate(message: Message, bot: Bot, fmt: str = ""):
     else:
         await message.answer("⏳ Генерирую черновик, подожди ~30-60 сек…")
     try:
-        res = await content.generate_article(length_hint=length_hint)
+        res = await content.generate_article(topic=topic, length_hint=length_hint)
     except Exception as e:
         logger.exception("generate")
         await message.answer(f"❌ Ошибка генерации: {e}")

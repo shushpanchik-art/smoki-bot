@@ -159,4 +159,4 @@ main защищён, только через PR с зелёным CI. .env.examp
 - [ ] P2 #10 «Обычный» → своя тема: FSM waiting_topic + waiting_length
       (_do_generate(fmt="") сейчас берёт случайную тему).
 - [ ] P2 #12 /setlen перевести на inline-кнопки ±1 / ±50 (связано с P2 #6).
-- [x] #17 Модерация/паблик: фото сшивать с ПЕРВОЙ частью текста (caption ≤1024), остаток отдельными сообщениями, кнопки на последнем. ✅ Реализовано в services/publisher.send_photo_with_text (_caption_split по абзацу ≤1024, _split остатка, reply_markup на последнем); используется в publish_article и handlers/admin.py.
+- [x] #17 Модерация/паблик: фото сшивать с ПЕРВОЙ частью текста (caption ≤1024), остаток отдельными сообщениями, кнопки на последнем. ✅ Реализовано в `services/publisher.send_photo_with_text` (`_caption_split` по абзацу ≤1024, `_split` остатка, `reply_markup` на последнем); используется в `publish_article` и `handlers/admin.py`.

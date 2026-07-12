@@ -4,6 +4,8 @@ import random
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+from aiogram import Bot
 
 import config
 from db import database
@@ -13,11 +15,14 @@ from services import comments, content, publisher
 logger = logging.getLogger("smoki.scheduler")
 
 _scheduler: AsyncIOScheduler | None = None
+_bot: Bot | None = None
 
 
-async def _generate_and_moderate(bot, length_hint: str, label: str):
+async def _generate_and_moderate(length_hint: str, label: str):
     from handlers import admin
     logger.info("Планировщик: старт генерации (%s)", label)
+    assert _bot is not None
+    bot = _bot
     try:
         res = await content.generate_article(length_hint=length_hint)
         if not res.get("ok"):
@@ -36,23 +41,25 @@ async def _generate_and_moderate(bot, length_hint: str, label: str):
         logger.exception("Ошибка в плановой генерации")
 
 
-async def _job_morning(bot):
+async def _job_morning():
     """Утро: 1-3 факта + остроумный коммент → модерация."""
     n = int(await database.get_setting("morning_facts",
                                        str(config.MORNING_LEN_DEFAULT)) or config.MORNING_LEN_DEFAULT)
-    await _generate_and_moderate(bot, prompts.facts_rules(n), "утро")
+    await _generate_and_moderate(prompts.facts_rules(n), "утро")
 
 
-async def _job_evening(bot):
+async def _job_evening():
     """Вечер: лонг-рид заданной длины → модерация."""
     w = int(await database.get_setting("evening_words",
                                        str(config.EVENING_WORDS_DEFAULT)) or config.EVENING_WORDS_DEFAULT)
-    await _generate_and_moderate(bot, prompts.words_rule(w), "вечер")
+    await _generate_and_moderate(prompts.words_rule(w), "вечер")
 
 
-async def _job_deadline(bot):
+async def _job_deadline():
     """Дедлайн окна публикации: если статья на модерации висит — публикуем сами."""
     logger.info("Планировщик: проверка дедлайна публикации")
+    assert _bot is not None
+    bot = _bot
     try:
         art = await database.get_latest_pending_article()
         if not art:
@@ -76,11 +83,12 @@ async def _job_deadline(bot):
         logger.exception("Ошибка в дедлайн-джобе")
 
 
-async def _job_comments(bot):
+async def _job_comments():
     """Модерация новых комментариев в группе-обсуждении."""
     logger.info("Планировщик: обработка комментариев")
+    assert _bot is not None
     try:
-        stats = await comments.process_new_comments(bot)
+        stats = await comments.process_new_comments(_bot)
         logger.info("Комментарии обработаны: %s", stats)
     except Exception:
         logger.exception("Ошибка в джобе модерации комментариев")
@@ -92,12 +100,19 @@ def _random_minute() -> int:
 
 def start(bot) -> AsyncIOScheduler:
     """Запуск планировщика. Вызывать после создания bot в main()."""
-    global _scheduler
+    global _scheduler, _bot
     if _scheduler:
         return _scheduler
 
+    _bot = bot
+
+    jobstores = {
+        "default": SQLAlchemyJobStore(url=f"sqlite:///{config.DB_PATH}"),
+    }
+
     sched = AsyncIOScheduler(
         timezone="Europe/Moscow",
+        jobstores=jobstores,
         job_defaults={
             "misfire_grace_time": 3600,
             "coalesce": True,
@@ -110,7 +125,7 @@ def start(bot) -> AsyncIOScheduler:
     sched.add_job(
         _job_morning,
         CronTrigger(hour=config.MORNING_START, minute=m_min),
-        args=[bot], id="daily_morning", replace_existing=True,
+        id="daily_morning", replace_existing=True,
     )
     logger.info("Джоб утро: %02d:%02d", config.MORNING_START, m_min)
 
@@ -119,7 +134,7 @@ def start(bot) -> AsyncIOScheduler:
     sched.add_job(
         _job_evening,
         CronTrigger(hour=config.EVENING_START, minute=e_min),
-        args=[bot], id="daily_evening", replace_existing=True,
+        id="daily_evening", replace_existing=True,
     )
     logger.info("Джоб вечер: %02d:%02d", config.EVENING_START, e_min)
 
@@ -127,7 +142,6 @@ def start(bot) -> AsyncIOScheduler:
     sched.add_job(
         _job_deadline,
         CronTrigger(hour=config.PUBLISH_WINDOW_END, minute=0),
-        args=[bot],
         id="publish_deadline",
         replace_existing=True,
     )
@@ -137,7 +151,6 @@ def start(bot) -> AsyncIOScheduler:
     sched.add_job(
         _job_comments,
         IntervalTrigger(hours=config.COMMENTS_INTERVAL_HOURS),
-        args=[bot],
         id="process_comments",
         replace_existing=True,
     )
@@ -146,5 +159,5 @@ def start(bot) -> AsyncIOScheduler:
 
     sched.start()
     _scheduler = sched
-    logger.info("Планировщик запущен")
+    logger.info("Планировщик запущен (persistent jobstore: %s)", config.DB_PATH)
     return sched

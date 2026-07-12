@@ -28,6 +28,8 @@ class ModerationStates(StatesGroup):
     waiting_reject_fb = State()
     waiting_liked_edit = State()
     waiting_censor_edit = State()
+    waiting_custom_topic = State()
+    waiting_custom_length = State()
 
 
 def _is_admin_id(uid: int) -> bool:
@@ -135,6 +137,32 @@ def _admin_kb() -> InlineKeyboardMarkup:
     ])
 
 
+def _back_kb() -> InlineKeyboardMarkup:
+    """Одна кнопка «Назад» → главное меню."""
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="\u2B05\uFE0F Назад", callback_data="adm_back"),
+    ]])
+
+
+def _len_kb(cur_m: int, cur_e: int) -> InlineKeyboardMarkup:
+    """Клавиатура регулировки длины постов кнопками ±."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="\u2600\uFE0F утро \u2212", callback_data="len:m:-"),
+            InlineKeyboardButton(text=f"{cur_m}", callback_data="len:noop"),
+            InlineKeyboardButton(text="\u2600\uFE0F утро +", callback_data="len:m:+"),
+        ],
+        [
+            InlineKeyboardButton(text="\U0001F319 вечер \u2212", callback_data="len:e:-"),
+            InlineKeyboardButton(text=f"{cur_e}", callback_data="len:noop"),
+            InlineKeyboardButton(text="\U0001F319 вечер +", callback_data="len:e:+"),
+        ],
+        [
+            InlineKeyboardButton(text="\u2B05\uFE0F Назад", callback_data="adm_back"),
+        ],
+    ])
+
+
 async def _cb_msg(cq: CallbackQuery) -> Message | None:
     """Вернуть Message из callback, если доступен (не Inaccessible)."""
     msg = cq.message
@@ -193,7 +221,8 @@ async def cb_adm_stats(cq: CallbackQuery):
         f"\u23F3 На модерации: <b>{s['pending']}</b>\n"
         f"\u274C Отклонено: <b>{s['rejected']}</b>\n"
         f"\U0001F5C2 Тем всего: <b>{s['topics']}</b>\n"
-        f"\U0001F4AC Комментариев: <b>{s['comments']}</b>\n"
+        f"\U0001F4AC Комментов отвечено: <b>{s['comments_replied']}</b>\n"
+        f"\U0001F5D1 Комментов удалено: <b>{s['comments_deleted']}</b>\n"
         f"\U0001F916 Вызовов ИИ: <b>{s['ai_calls']}</b>\n"
         f"\U0001F553 Последняя публикация: <b>{last}</b>"
     )
@@ -206,17 +235,81 @@ async def cb_adm_len(cq: CallbackQuery):
     if not await _cb_guard(cq) or msg is None:
         return
     await cq.answer()
-    cur_m = await db.get_setting("morning_facts", str(config.MORNING_LEN_DEFAULT))
-    cur_e = await db.get_setting("evening_words", str(config.EVENING_WORDS_DEFAULT))
-    await msg.answer(
+    await _show_len_menu(msg)
+
+
+async def _show_len_menu(msg: Message, edit: bool = False) -> None:
+    """Показать/обновить меню длины постов с кнопками ±."""
+    cur_m = int(await db.get_setting(
+        "morning_facts", str(config.MORNING_LEN_DEFAULT))
+        or config.MORNING_LEN_DEFAULT)
+    cur_e = int(await db.get_setting(
+        "evening_words", str(config.EVENING_WORDS_DEFAULT))
+        or config.EVENING_WORDS_DEFAULT)
+    text = (
         "\U0001F4CF <b>Длина постов</b>\n\n"
-        f"\u2022 утро (фактов): <b>{cur_m}</b>\n"
-        f"\u2022 вечер (слов): <b>{cur_e}</b>\n\n"
-        "Изменить:\n"
-        "<code>/setlen morning 2</code> (1-3)\n"
-        "<code>/setlen evening 400</code> (200-500)",
-        parse_mode="HTML",
+        f"\u2600\uFE0F утро: <b>{cur_m}</b> факт(ов)  (1\u20133)\n"
+        f"\U0001F319 вечер: <b>{cur_e}</b> слов  (200\u2013500)\n\n"
+        "Регулируй кнопками \u2212/+ ниже."
     )
+    kb = _len_kb(cur_m, cur_e)
+    if edit and hasattr(msg, "edit_text"):
+        try:
+            await msg.edit_text(text, parse_mode="HTML", reply_markup=kb)
+            return
+        except Exception:
+            pass
+    await msg.answer(text, parse_mode="HTML", reply_markup=kb)
+
+
+# ---------- навигация: Назад в главное меню ----------
+@router.callback_query(F.data == "adm_back")
+async def cb_adm_back(cq: CallbackQuery, state: FSMContext):
+    msg = await _cb_msg(cq)
+    if not await _cb_guard(cq) or msg is None:
+        return
+    await state.clear()
+    await cq.answer()
+    text = "\U0001F6E0 <b>SMOKI \u2014 админ-панель</b>\n\nУправление через кнопки ниже:"
+    if hasattr(msg, "edit_text"):
+        try:
+            await msg.edit_text(text, parse_mode="HTML", reply_markup=_admin_kb())
+            return
+        except Exception:
+            pass
+    await msg.answer(text, parse_mode="HTML", reply_markup=_admin_kb())
+
+
+# ---------- регулировка длины постов кнопками len:X:Y ----------
+@router.callback_query(F.data.startswith("len:"))
+async def cb_len_adjust(cq: CallbackQuery):
+    msg = await _cb_msg(cq)
+    if not await _cb_guard(cq) or msg is None:
+        return
+    parts = (cq.data or "").split(":")
+    if len(parts) < 2 or parts[1] == "noop":
+        await cq.answer()
+        return
+    which, op = parts[1], (parts[2] if len(parts) > 2 else "")
+    if which == "m":
+        key, lo, hi = "morning_facts", 1, 3
+        cur = int(await db.get_setting(key, str(config.MORNING_LEN_DEFAULT))
+                  or config.MORNING_LEN_DEFAULT)
+    else:
+        key, lo, hi = "evening_words", 200, 500
+        cur = int(await db.get_setting(key, str(config.EVENING_WORDS_DEFAULT))
+                  or config.EVENING_WORDS_DEFAULT)
+        step = 50
+    step = 1 if which == "m" else 50
+    new = cur + step if op == "+" else cur - step
+    new = max(lo, min(hi, new))
+    if new != cur:
+        await db.set_setting(key, str(new))
+        await cq.answer(f"\u2713 {new}")
+    else:
+        await cq.answer("\u26A0\uFE0F предел")
+    await _show_len_menu(msg, edit=True)
+
 
 
 @router.callback_query(F.data == "adm_liked")
@@ -226,9 +319,10 @@ async def cb_adm_liked(cq: CallbackQuery):
         return
     await cq.answer()
     val = await db.get_setting("liked_feedback") or "—"
-    kb = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="\u270F\uFE0F Изменить", callback_data="adm_liked_edit"),
-    ]])
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="\u270F\uFE0F Изменить", callback_data="adm_liked_edit")],
+        [InlineKeyboardButton(text="\u2B05\uFE0F Назад", callback_data="adm_back")],
+    ])
     await msg.answer(
         f"\U0001F49B <b>Правила «нравится»</b>\n\n{val[:3500]}",
         parse_mode="HTML",
@@ -243,9 +337,10 @@ async def cb_adm_censor(cq: CallbackQuery):
         return
     await cq.answer()
     val = await db.get_setting("censor_extra") or "—"
-    kb = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="\u270F\uFE0F Изменить", callback_data="adm_censor_edit"),
-    ]])
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="\u270F\uFE0F Изменить", callback_data="adm_censor_edit")],
+        [InlineKeyboardButton(text="\u2B05\uFE0F Назад", callback_data="adm_back")],
+    ])
     await msg.answer(
         f"\U0001F6AB <b>Правила цензуры</b>\n\n{val[:3500]}",
         parse_mode="HTML",

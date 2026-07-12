@@ -119,10 +119,10 @@ main защищён, только через PR с зелёным CI. .env.examp
 - [x] P2 #1 Меню команд бота (set_my_commands scope=admin + set_chat_menu_button MenuButtonCommands). Полный набор команд для админа, пусто для остальных. ✅ PR feat/bot-menu-commands
 - [x] P2 #2 Убрать текстовую панель «SMOKI content bot готов… Команды:» и reply-клавиатуру команд под строкой ввода (оставить только inline). ✅ /start теперь показывает только inline-панель.
 - [x] P2 #15 Кнопка «Сделать бэкап» в панели: запуск бэкапа + реальный отчёт из journald. ✅ Работает (PR #58/#59).
-- [x] P2 #22 Telegram-уведомления об АВТО-бэкапах админу: `scripts/notify_admin.sh` (события backup/offsite/offsite-full — failed/recovered + периодическая сводка backup-ok, анти-дубликаты через state-файлы в /var/lib/smoki-backup). Подключено: systemd `OnFailure=*-alert.service` (провал) и `trap ERR`/`*-recovered` в backup_offsite.sh / backup_full_offsite.sh (успех/восстановление). Проверено вручную: backup-ok доходит до админа.
+- [x] P2 #22 Telegram-уведомления об АВТО-бэкапах админу: `scripts/notify_admin.sh` (события backup/offsite/offsite-full — failed/recovered + периодическая сводка backup-ok, анти-дубликаты через state-файлы в /var/lib/smoki-backup). Подключено: systemd `OnFailure=*-alert.service` (провал) и `trap ERR`/`*-recovered` в backup_offsite.sh / backup_full_offsite.sh (успех/восстановление). После успешного offsite backup_offsite.sh явно вызывает `backup-ok` (PR #83) — админу приходит ежедневное «✅ backup OK» (не чаще раза в 20 ч). Проверено на проде: сообщение доходит.
 - [x] P2 #3 Счётчик комментариев исправлен (PR #80): get_stats() возвращает comments_total (все полученные) и comments_new (ждут обработки); панель показывает получено/отвечено/ждут/удалено.
 - [x] P2 #5 Кнопка «Назад» в подменю реализована: `_back_kb()`/`_len_kb()` содержат кнопку `adm_back`, обработчик `cb_adm_back` (handlers/admin.py) возвращает в главное меню и сбрасывает FSM. Присутствует в подменю Длина/Нравится/Цензура.
-- [ ] P2 #6 Редактирование длины постов кнопками (не только /setlen).
+- [x] P2 #6 Редактирование длины постов кнопками (не только /setlen). ✅ Реализовано: `_len_kb`/`cb_adm_len`/`cb_len_adjust` (handlers/admin.py) — inline ±, утро шаг 1 (1-3), вечер шаг 50 (200-500), запись в БД (morning_facts/evening_words).
 - [x] P2 #7 Редактирование правил «нравится» через панель. ✅ PR #63 (feature/edit-rules-panel).
 - [x] P2 #8 Редактирование правил цензуры через панель. ✅ PR #63 (feature/edit-rules-panel).
 - [x] P1 #19 Автопубликация лонг-рида по дедлайну: РАЗВЕДКА — бага в коде нет. `_job_deadline` (cron `hour=PUBLISH_WINDOW_END`, `misfire_grace_time=3600`, `coalesce=True`) публикует статьи в статусе draft. Пропуск объяснён простоем службы вне окна публикации. Риск снижается persistent jobstore — см. P2 #21.
@@ -163,7 +163,7 @@ main защищён, только через PR с зелёным CI. .env.examp
       Ввод темы (`waiting_custom_topic`) уже реализован в P1.
 - [x] P2 #21 Persistent jobstore (SQLAlchemyJobStore на smoki.db) вместо memory:
       пропущенные при простое джобы (дедлайн, публикация) отрабатывают после старта. ✅ feature/spec-21-persistent-jobstore (смёржен).
-- [ ] P2 #12 /setlen перевести на inline-кнопки ±1 / ±50 (связано с P2 #6).
+- [x] P2 #12 /setlen на inline-кнопки ±1 / ±50 — реализовано вместе с #6 (кнопки `len:m:±`/`len:e:±`, callback `cb_len_adjust`; /setlen остался как дубль для быстрого доступа).
 - [x] #17 Модерация/паблик: фото сшивать с ПЕРВОЙ частью текста (caption ≤1024), остаток отдельными сообщениями, кнопки на последнем. ✅ Реализовано в `services/publisher.send_photo_with_text` (`_caption_split` по абзацу ≤1024, `_split` остатка, `reply_markup` на последнем); используется в `publish_article` и `handlers/admin.py`.
 
 ## Выученные уроки (операционные)

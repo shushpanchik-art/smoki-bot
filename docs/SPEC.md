@@ -159,7 +159,21 @@ main защищён, только через PR с зелёным CI. .env.examp
 
 - [ ] P2 #10 «Обычный» → своя тема: уточнение ДЛИНЫ через FSM (`waiting_custom_length`) после ввода темы.
       Ввод темы (`waiting_custom_topic`) уже реализован в P1.
-- [ ] P2 #21 Persistent jobstore (SQLAlchemyJobStore на smoki.db) вместо memory:
-      пропущенные при простое джобы (дедлайн, публикация) отрабатывают после старта.
+- [x] P2 #21 Persistent jobstore (SQLAlchemyJobStore на smoki.db) вместо memory:
+      пропущенные при простое джобы (дедлайн, публикация) отрабатывают после старта. ✅ feature/spec-21-persistent-jobstore (смёржен).
 - [ ] P2 #12 /setlen перевести на inline-кнопки ±1 / ±50 (связано с P2 #6).
 - [x] #17 Модерация/паблик: фото сшивать с ПЕРВОЙ частью текста (caption ≤1024), остаток отдельными сообщениями, кнопки на последнем. ✅ Реализовано в `services/publisher.send_photo_with_text` (`_caption_split` по абзацу ≤1024, `_split` остатка, `reply_markup` на последнем); используется в `publish_article` и `handlers/admin.py`.
+
+## Выученные уроки (операционные)
+
+- **Беспарольный рестарт**: настроен sudoers drop-in `/etc/sudoers.d/smoki-bot`
+  (по образцу `smoktolk-bot`). Разрешены без пароля: `systemctl restart/start/stop/status smoki-bot`.
+  Проверка синтаксиса перед активацией обязательна: `sudo visudo -c`.
+  Тест: `sudo -n systemctl restart smoki-bot` (флаг `-n` = не спрашивать пароль).
+- **Чистка веток-зомби**: смёрженные локальные ветки удалять `git branch -d <name>`;
+  устаревшие remote-tracking refs — `git remote prune origin`.
+  После merge PR через UI удалённая ветка на GitHub исчезает, локально остаётся зомби.
+- **Кэш `__pycache__`**: покрыт `.gitignore`, git его не видит; периодически чистить
+  `find . -path ./venv -prune -o -name __pycache__ -type d -exec rm -rf {} +`.
+- **journalctl**: для свежих логов после рестарта надёжнее `--since` по времени,
+  чем `-n50` (последнее может захватить хвост старого процесса).

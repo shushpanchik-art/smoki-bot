@@ -166,14 +166,14 @@ main защищён, только через PR с зелёным CI. .env.examp
 
 ## Выученные уроки (операционные)
 
-- **Беспарольный рестарт**: настроен sudoers drop-in `/etc/sudoers.d/smoki-bot`
+- __Беспарольный рестарт__: настроен sudoers drop-in `/etc/sudoers.d/smoki-bot`
   (по образцу `smoktolk-bot`). Разрешены без пароля: `systemctl restart/start/stop/status smoki-bot`.
   Проверка синтаксиса перед активацией обязательна: `sudo visudo -c`.
   Тест: `sudo -n systemctl restart smoki-bot` (флаг `-n` = не спрашивать пароль).
-- **Чистка веток-зомби**: смёрженные локальные ветки удалять `git branch -d <name>`;
+- __Чистка веток-зомби__: смёрженные локальные ветки удалять `git branch -d <name>`;
   устаревшие remote-tracking refs — `git remote prune origin`.
   После merge PR через UI удалённая ветка на GitHub исчезает, локально остаётся зомби.
-- **Кэш `__pycache__`**: покрыт `.gitignore`, git его не видит; периодически чистить
+- __Кэш байткода__: каталоги `__pycache__` покрыты `.gitignore`, git их не видит; периодически чистить
   `find . -path ./venv -prune -o -name __pycache__ -type d -exec rm -rf {} +`.
-- **journalctl**: для свежих логов после рестарта надёжнее `--since` по времени,
+- __journalctl__: для свежих логов после рестарта надёжнее `--since` по времени,
   чем `-n50` (последнее может захватить хвост старого процесса).

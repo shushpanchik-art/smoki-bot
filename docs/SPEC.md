@@ -119,8 +119,9 @@ main защищён, только через PR с зелёным CI. .env.examp
 - [x] P2 #1 Меню команд бота (set_my_commands scope=admin + set_chat_menu_button MenuButtonCommands). Полный набор команд для админа, пусто для остальных. ✅ PR feat/bot-menu-commands
 - [x] P2 #2 Убрать текстовую панель «SMOKI content bot готов… Команды:» и reply-клавиатуру команд под строкой ввода (оставить только inline). ✅ /start теперь показывает только inline-панель.
 - [x] P2 #15 Кнопка «Сделать бэкап» в панели: запуск бэкапа + реальный отчёт из journald. ✅ Работает (PR #58/#59).
+- [x] P2 #22 Telegram-уведомления об АВТО-бэкапах админу: `scripts/notify_admin.sh` (события backup/offsite/offsite-full — failed/recovered + периодическая сводка backup-ok, анти-дубликаты через state-файлы в /var/lib/smoki-backup). Подключено: systemd `OnFailure=*-alert.service` (провал) и `trap ERR`/`*-recovered` в backup_offsite.sh / backup_full_offsite.sh (успех/восстановление). Проверено вручную: backup-ok доходит до админа.
 - [x] P2 #3 Счётчик комментариев исправлен (PR #80): get_stats() возвращает comments_total (все полученные) и comments_new (ждут обработки); панель показывает получено/отвечено/ждут/удалено.
-- [ ] P2 #5 Кнопка «Назад» в подменю (Длина/Цензура/Нравится → главное меню).
+- [x] P2 #5 Кнопка «Назад» в подменю реализована: `_back_kb()`/`_len_kb()` содержат кнопку `adm_back`, обработчик `cb_adm_back` (handlers/admin.py) возвращает в главное меню и сбрасывает FSM. Присутствует в подменю Длина/Нравится/Цензура.
 - [ ] P2 #6 Редактирование длины постов кнопками (не только /setlen).
 - [x] P2 #7 Редактирование правил «нравится» через панель. ✅ PR #63 (feature/edit-rules-panel).
 - [x] P2 #8 Редактирование правил цензуры через панель. ✅ PR #63 (feature/edit-rules-panel).

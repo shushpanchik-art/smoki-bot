@@ -113,7 +113,7 @@ main защищён, только через PR с зелёным CI. .env.examp
 
 Приоритет P1 — ломает UX, P2 — улучшение, P3 — nice-to-have.
 
-- [ ] P1 #9 Кнопки «Обычный/Утро/Вечер» не запускают генерацию (adm_gen/adm_gen_m/adm_gen_e).
+- [x] P1 #9 (устранено: хендлеры `cb_adm_gen/_m/_e` зарегистрированы, `callback_data` совпадают, тела вызывают `_do_generate` → `content.generate_article` → `send_for_moderation`; guard проверяет админа; в логах callback-ошибок нет) Кнопки «Обычный/Утро/Вечер» не запускают генерацию (`adm_gen`/`adm_gen_m`/`adm_gen_e`).
 - [ ] P1 #10 «Обычный» → «Своя тема»: админ вводит тему текстом, бот отдельно уточняет длину (FSM), учитывает при генерации.
 - [x] P2 #1 Меню команд бота (set_my_commands scope=admin + set_chat_menu_button MenuButtonCommands). Полный набор команд для админа, пусто для остальных. ✅ PR feat/bot-menu-commands
 - [x] P2 #2 Убрать текстовую панель «SMOKI content bot готов… Команды:» и reply-клавиатуру команд под строкой ввода (оставить только inline). ✅ /start теперь показывает только inline-панель.

@@ -220,6 +220,9 @@ async def get_stats() -> dict:
             "SELECT COUNT(*) FROM comments WHERE status = 'replied'")
         comments_deleted = await _one(
             "SELECT COUNT(*) FROM comments WHERE status = 'deleted'")
+        comments_total = await _one("SELECT COUNT(*) FROM comments")
+        comments_new = await _one(
+            "SELECT COUNT(*) FROM comments WHERE status = 'new'")
         ai_calls = await _one("SELECT COUNT(*) FROM ai_logs")
 
         cur = await conn.execute(
@@ -236,6 +239,8 @@ async def get_stats() -> dict:
         "topics": topics,
         "comments_replied": comments_replied,
         "comments_deleted": comments_deleted,
+        "comments_total": comments_total,
+        "comments_new": comments_new,
         "ai_calls": ai_calls,
         "last_published": last_published,
     }

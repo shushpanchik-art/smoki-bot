@@ -243,6 +243,7 @@ async def cb_adm_stats(cq: CallbackQuery):
         f"\U0001F195 Ждут обработки: <b>{s['comments_new']}</b>\n"
         f"\U0001F5D1 Комментов удалено: <b>{s['comments_deleted']}</b>\n"
         f"\U0001F916 Вызовов ИИ: <b>{s['ai_calls']}</b>\n"
+        f"\U0001F9EE Токенов израсходовано: <b>{s['tokens_total']}</b>\n"
         f"\U0001F553 Последняя публикация: <b>{last}</b>"
     )
     await msg.answer(text, parse_mode="HTML")

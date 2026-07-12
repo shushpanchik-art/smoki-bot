@@ -14,6 +14,7 @@ async def test_get_stats_empty_db(tmp_db):
     assert s["comments_total"] == 0
     assert s["comments_new"] == 0
     assert s["ai_calls"] == 0
+    assert s["tokens_total"] == 0
     assert s["last_published"] is None
 
 
@@ -26,7 +27,7 @@ async def test_get_stats_counts_topics(tmp_db):
         "published", "pending", "rejected",
         "topics", "comments_replied", "comments_deleted",
         "comments_total", "comments_new",
-        "ai_calls", "last_published",
+        "ai_calls", "tokens_total", "last_published",
     }
 
 

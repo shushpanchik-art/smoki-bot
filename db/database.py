@@ -224,6 +224,9 @@ async def get_stats() -> dict:
         comments_new = await _one(
             "SELECT COUNT(*) FROM comments WHERE status = 'new'")
         ai_calls = await _one("SELECT COUNT(*) FROM ai_logs")
+        tokens_total = await _one(
+            "SELECT COALESCE(SUM(input_tokens), 0) "
+            "+ COALESCE(SUM(output_tokens), 0) FROM ai_logs")
 
         cur = await conn.execute(
             "SELECT published_at FROM articles "
@@ -242,5 +245,6 @@ async def get_stats() -> dict:
         "comments_total": comments_total,
         "comments_new": comments_new,
         "ai_calls": ai_calls,
+        "tokens_total": tokens_total,
         "last_published": last_published,
     }

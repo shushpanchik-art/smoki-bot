@@ -114,7 +114,7 @@ main защищён, только через PR с зелёным CI. .env.examp
 Приоритет P1 — ломает UX, P2 — улучшение, P3 — nice-to-have.
 
 - [x] P1 #9 (устранено: хендлеры `cb_adm_gen/_m/_e` зарегистрированы, `callback_data` совпадают, тела вызывают `_do_generate` → `content.generate_article` → `send_for_moderation`; guard проверяет админа; в логах callback-ошибок нет) Кнопки «Обычный/Утро/Вечер» не запускают генерацию (`adm_gen`/`adm_gen_m`/`adm_gen_e`).
-- [ ] P1 #10 «Обычный» → «Своя тема»: админ вводит тему текстом, бот отдельно уточняет длину (FSM), учитывает при генерации.
+- [x] P1 #10 «Обычный» → «Своя тема»: кнопка спрашивает тему (FSM `waiting_custom_topic`), `-` = случайная. Уточнение длины отложено в P2. ✅ feature/spec-10-custom-topic.
 - [x] P2 #1 Меню команд бота (set_my_commands scope=admin + set_chat_menu_button MenuButtonCommands). Полный набор команд для админа, пусто для остальных. ✅ PR feat/bot-menu-commands
 - [x] P2 #2 Убрать текстовую панель «SMOKI content bot готов… Команды:» и reply-клавиатуру команд под строкой ввода (оставить только inline). ✅ /start теперь показывает только inline-панель.
 - [x] P2 #15 Кнопка «Сделать бэкап» в панели: запуск бэкапа + реальный отчёт из journald. ✅ Работает (PR #58/#59).
@@ -123,6 +123,7 @@ main защищён, только через PR с зелёным CI. .env.examp
 - [ ] P2 #6 Редактирование длины постов кнопками (не только /setlen).
 - [x] P2 #7 Редактирование правил «нравится» через панель. ✅ PR #63 (feature/edit-rules-panel).
 - [x] P2 #8 Редактирование правил цензуры через панель. ✅ PR #63 (feature/edit-rules-panel).
+- [x] P1 #19 Автопубликация лонг-рида по дедлайну: РАЗВЕДКА — бага в коде нет. `_job_deadline` (cron `hour=PUBLISH_WINDOW_END`, `misfire_grace_time=3600`, `coalesce=True`) публикует статьи в статусе draft. Пропуск объяснён простоем службы вне окна публикации. Риск снижается persistent jobstore — см. P2 #21.
 - [ ] P3 #4 Остаток квоты Vertex через SDK НЕДОСТУПЕН (только Cloud Quotas API + IAM — вне MVP). Вместо этого: суммировать РАСХОД токенов из resp.usage_metadata.total_token_count в ai_logs → показ «Токенов израсходовано» в статистике. Отложено, настроим последним.
 
 ## Синхронизация по коду (сверка тел функций handlers/admin.py)
@@ -156,7 +157,9 @@ main защищён, только через PR с зелёным CI. .env.examp
 
 ## Свежие технические задачи (разведка)
 
-- [ ] P2 #10 «Обычный» → своя тема: FSM waiting_topic + waiting_length
-      (_do_generate(fmt="") сейчас берёт случайную тему).
+- [ ] P2 #10 «Обычный» → своя тема: уточнение ДЛИНЫ через FSM (`waiting_custom_length`) после ввода темы.
+      Ввод темы (`waiting_custom_topic`) уже реализован в P1.
+- [ ] P2 #21 Persistent jobstore (SQLAlchemyJobStore на smoki.db) вместо memory:
+      пропущенные при простое джобы (дедлайн, публикация) отрабатывают после старта.
 - [ ] P2 #12 /setlen перевести на inline-кнопки ±1 / ±50 (связано с P2 #6).
 - [x] #17 Модерация/паблик: фото сшивать с ПЕРВОЙ частью текста (caption ≤1024), остаток отдельными сообщениями, кнопки на последнем. ✅ Реализовано в `services/publisher.send_photo_with_text` (`_caption_split` по абзацу ≤1024, `_split` остатка, `reply_markup` на последнем); используется в `publish_article` и `handlers/admin.py`.

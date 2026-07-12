@@ -47,6 +47,7 @@
 - services (content.py, publisher.py, comments.py)
 - handlers (admin.py, group.py, ROUTERS)
 - scripts/ai_healthcheck.py
+- docs (SPEC.md, TESTING.md, PROJECT_BOOK.txt)
 
 ## Локальные проверки перед push (обязательно)
 

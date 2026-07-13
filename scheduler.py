@@ -137,6 +137,16 @@ async def _job_comments():
         logger.exception("Ошибка в джобе модерации комментариев")
 
 
+async def _job_heartbeat():
+    """Heartbeat: доказательство живого scheduler-цикла.
+
+    Пишет маркер "HEARTBEAT ok" в journald. Внешний systemd-timer
+    (heartbeat_healthcheck.sh) грепает journald на свежесть маркера
+    и алертит, если бот/планировщик завис (сам себя проверить не может).
+    """
+    logger.info("HEARTBEAT ok")
+
+
 def _random_minute() -> int:
     return random.randint(0, 59)
 
@@ -229,6 +239,18 @@ def start(bot) -> AsyncIOScheduler:
     )
     logger.info("Джоб модерации комментариев: каждые %d ч",
                 config.COMMENTS_INTERVAL_HOURS)
+
+    # Heartbeat: маркер живого scheduler-цикла каждые N часов
+    sched.add_job(
+        _job_heartbeat,
+        IntervalTrigger(hours=config.HEARTBEAT_INTERVAL_HOURS),
+        id="heartbeat",
+        replace_existing=True,
+        misfire_grace_time=1800,
+        coalesce=True,
+    )
+    logger.info("Джоб heartbeat: каждые %d ч",
+                config.HEARTBEAT_INTERVAL_HOURS)
 
     sched.start()
     _scheduler = sched

@@ -9,6 +9,8 @@
 #   notify_admin.sh offsite-recovered      # offsite-бэкап БД восстановлен
 #   notify_admin.sh offsite-full-failed    # full-offsite упал
 #   notify_admin.sh offsite-full-recovered # full-offsite восстановлен
+#   notify_admin.sh heartbeat-failed        # планировщик завис
+#   notify_admin.sh heartbeat-recovered     # планировщик ожил
 #
 # Анти-дубликат через state-файлы в /var/lib/smoki-backup.
 set -euo pipefail
@@ -22,6 +24,7 @@ BACKUP_STATE_DIR="${BACKUP_STATE_DIR:-/var/lib/smoki-backup}"
 BACKUP_STATE_FILE="${BACKUP_STATE_DIR}/failed"
 OFFSITE_STATE_FILE="${BACKUP_STATE_DIR}/offsite-failed"
 OFFSITE_FULL_STATE_FILE="${BACKUP_STATE_DIR}/offsite-full-failed"
+HEARTBEAT_STATE_FILE="${BACKUP_STATE_DIR}/heartbeat-failed"
 
 log() { logger -t "$LOG_TAG" -- "$*" 2>/dev/null || true; echo "[$LOG_TAG] $*"; }
 
@@ -127,6 +130,29 @@ case "$EVENT" in
 Очередная отправка полного архива на Я.Диск прошла успешно."
         if send_telegram "$TEXT"; then rm -f "$OFFSITE_FULL_STATE_FILE"; log "OK: offsite-full state-файл удалён"; else exit $?; fi
         ;;
+    heartbeat-failed)
+        ensure_backup_state_dir
+        if [ -e "$HEARTBEAT_STATE_FILE" ]; then
+            log "INFO: heartbeat state-файл уже есть — пропускаю"; exit 0
+        fi
+        read_credentials
+        touch "$HEARTBEAT_STATE_FILE"; chown "$BACKUP_OWNER" "$HEARTBEAT_STATE_FILE" 2>/dev/null || true
+        TEXT="🚨 *SMOKI heartbeat FAILED*
+Планировщик не подавал признаков жизни дольше нормы.
+Возможно, бот завис или упал.
+Проверь: \`systemctl status smoki-bot\`
+Логи: \`journalctl -u smoki-bot -n 50\`"
+        send_telegram "$TEXT" || exit $?
+        ;;
+    heartbeat-recovered)
+        if [ ! -e "$HEARTBEAT_STATE_FILE" ]; then
+            log "INFO: heartbeat state-файл отсутствует — RECOVERED не нужен"; exit 0
+        fi
+        read_credentials
+        TEXT="✅ *SMOKI heartbeat восстановлен*
+Планировщик снова подаёт признаки жизни."
+        if send_telegram "$TEXT"; then rm -f "$HEARTBEAT_STATE_FILE"; log "OK: heartbeat state-файл удалён"; else exit $?; fi
+        ;;
     backup-ok)
         ensure_backup_state_dir
         OK_STATE_FILE="${BACKUP_STATE_DIR}/last-ok-notify"
@@ -214,7 +240,7 @@ case "$EVENT" in
         send_telegram "$TEXT" || exit $?
         ;;
     *)
-        log "ERROR: неизвестное событие: '$EVENT'. Допустимо: backup-failed, backup-recovered, backup-ok, offsite-failed, offsite-recovered, offsite-full-failed, offsite-full-recovered, daily-summary"
+        log "ERROR: неизвестное событие: '$EVENT'. Допустимо: backup-failed, backup-recovered, backup-ok, offsite-failed, offsite-recovered, offsite-full-failed, offsite-full-recovered, heartbeat-failed, heartbeat-recovered, daily-summary"
         exit 2
         ;;
 esac

@@ -1,0 +1,13 @@
+[Unit]
+Description=SMOKI scheduler heartbeat healthcheck
+Documentation=file:/opt/SMOKI/bot/scripts/heartbeat_healthcheck.sh
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=BOT_DIR=/opt/SMOKI/bot
+ExecStart=/opt/SMOKI/bot/scripts/heartbeat_healthcheck.sh
+
+[Install]
+WantedBy=multi-user.target

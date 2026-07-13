@@ -235,7 +235,7 @@ P3 — nice-to-have. Разведка перед реализацией обяз
 
 ### A. Отказоустойчивость / надёжность
 
-- [ ] R1 (P1) Watchdog доставки в канал. `Restart=always` перезапускает
+- [x] R1 (P1) Watchdog доставки в канал. РЕАЛИЗОВАНО (PR feature/r1-delivery-watchdog): джоба _job_delivery_watchdog в PUBLISH_WINDOW_END+2 ч, get_undelivered_today() (pending/approved за сегодня), алерт админу в ЛС. `Restart=always` перезапускает
   процесс, но не гарантирует, что пост реально ушёл в Telegram. При ошибке/
   таймауте API статья остаётся в `draft`, админ не узнаёт. Если к концу окна
   публикации статья дня НЕ в статусе `published` — алерт админу в ЛС.

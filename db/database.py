@@ -117,6 +117,24 @@ async def get_latest_pending_article() -> dict | None:
         return dict(row) if row else None
 
 
+async def get_undelivered_today() -> list[dict]:
+    """Статьи, созданные сегодня, но НЕ опубликованные (для watchdog доставки).
+
+    Возвращает статьи в статусе pending/approved с created_at за текущую дату.
+    Пустой список = всё доставлено (или контента дня ещё не было).
+    """
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM articles "
+            "WHERE status IN ('pending', 'approved') "
+            "AND date(created_at) = date('now', 'localtime') "
+            "ORDER BY id ASC"
+        )
+        rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
+
 # ---------- comments ----------
 async def add_comment(chat_id: int, message_id: int, user_id: int,
                       username: str, text: str) -> bool:

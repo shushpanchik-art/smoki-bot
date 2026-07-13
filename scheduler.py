@@ -83,6 +83,34 @@ async def _job_deadline():
         logger.exception("Ошибка в дедлайн-джобе")
 
 
+async def _job_delivery_watchdog():
+    """Watchdog доставки: если статья дня не опубликована — алерт админу.
+
+    Запускается после окна публикации. Ловит случаи, когда publish_article
+    вернул ok=False или дедлайн-джоба не отработала (простой службы).
+    """
+    logger.info("Планировщик: watchdog доставки")
+    assert _bot is not None
+    bot = _bot
+    try:
+        stuck = await database.get_undelivered_today()
+        if not stuck:
+            logger.info("Watchdog: все статьи дня доставлены — ок")
+            return
+        ids = ", ".join(f"#{a['id']}" for a in stuck)
+        logger.warning("Watchdog: не опубликованы статьи дня: %s", ids)
+        try:
+            await bot.send_message(
+                config.ADMIN_CHAT_ID,
+                "⚠️ Watchdog доставки: статьи дня НЕ опубликованы в канал: "
+                f"{ids}. Проверь модерацию/логи публикации.",
+            )
+        except Exception:
+            logger.exception("Watchdog: не смог отправить алерт админу")
+    except Exception:
+        logger.exception("Ошибка в watchdog-джобе доставки")
+
+
 async def _job_comments():
     """Модерация новых комментариев в группе-обсуждении."""
     logger.info("Планировщик: обработка комментариев")
@@ -146,6 +174,18 @@ def start(bot) -> AsyncIOScheduler:
         replace_existing=True,
     )
     logger.info("Джоб дедлайна публикации: %02d:00", config.PUBLISH_WINDOW_END)
+
+    # Watchdog доставки: через 2 ч после окна публикации (но не позже 23:00)
+    wd_hour = min(config.PUBLISH_WINDOW_END + 2, 23)
+    sched.add_job(
+        _job_delivery_watchdog,
+        CronTrigger(hour=wd_hour, minute=0),
+        id="delivery_watchdog",
+        replace_existing=True,
+        misfire_grace_time=3600,
+        coalesce=True,
+    )
+    logger.info("Джоб watchdog доставки: %02d:00", wd_hour)
 
     # Модерация комментариев: интервал COMMENTS_INTERVAL_HOURS
     sched.add_job(

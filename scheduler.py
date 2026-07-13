@@ -1,5 +1,6 @@
 import logging
 import random
+from datetime import datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -248,6 +249,7 @@ def start(bot) -> AsyncIOScheduler:
         replace_existing=True,
         misfire_grace_time=1800,
         coalesce=True,
+        next_run_time=datetime.now(),
     )
     logger.info("Джоб heartbeat: каждые %d ч",
                 config.HEARTBEAT_INTERVAL_HOURS)

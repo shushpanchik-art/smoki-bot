@@ -69,3 +69,9 @@ EVENING_DEADLINE_MINUTE = _int("EVENING_DEADLINE_MINUTE", 30)
 MORNING_LEN_DEFAULT = _int("MORNING_LEN_DEFAULT", 3)      # число фактов 1-3
 EVENING_WORDS_DEFAULT = _int("EVENING_WORDS_DEFAULT", 350)  # слов 200-500
 
+# --- Heartbeat: доказательство живого scheduler-цикла ---
+# Джоба пишет "HEARTBEAT ok" в journald каждые N часов; внешний
+# systemd-timer (heartbeat_healthcheck.sh) проверяет свежесть и алертит.
+HEARTBEAT_INTERVAL_HOURS = _int("HEARTBEAT_INTERVAL_HOURS", 6)
+HEARTBEAT_MAX_AGE_HOURS = _int("HEARTBEAT_MAX_AGE_HOURS", 8)
+

@@ -160,8 +160,8 @@ Message|InaccessibleMessage. При /start отправляется ReplyKeyboar
 
 ## Свежие технические задачи (разведка)
 
-- [ ] P2 #10 «Обычный» → своя тема: уточнение ДЛИНЫ через FSM (`waiting_custom_length`) после ввода темы.
-      Ввод темы (`waiting_custom_topic`) уже реализован в P1.
+- [x] P2 #10 «Обычный» → своя тема: уточнение ДЛИНЫ через FSM (`waiting_custom_length`) после ввода темы.
+      Ввод темы (`waiting_custom_topic`) реализован в P1. ✅ feature/spec-10-custom-length.
 - [x] P2 #21 Persistent jobstore (SQLAlchemyJobStore на smoki.db) вместо memory:
       пропущенные при простое джобы (дедлайн, публикация) отрабатывают после старта. ✅ feature/spec-21-persistent-jobstore (смёржен).
 - [x] P2 #12 /setlen на inline-кнопки ±1 / ±50 — реализовано вместе с #6 (кнопки `len:m:±`/`len:e:±`, callback `cb_len_adjust`; /setlen остался как дубль для быстрого доступа).

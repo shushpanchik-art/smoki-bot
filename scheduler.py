@@ -127,6 +127,41 @@ async def _job_delivery_watchdog():
         logger.exception("Ошибка в watchdog-джобе доставки")
 
 
+def _minus_minutes(hour: int, minute: int, delta: int) -> tuple[int, int]:
+    """Вычесть delta минут из hour:minute, вернуть (hour, minute) в пределах суток."""
+    total = (hour * 60 + minute - delta) % (24 * 60)
+    return total // 60, total % 60
+
+
+async def _job_preview_warn():
+    """Предпросмотр перед автопубликацией: за N минут до дедлайна напомнить админу.
+
+    Если есть зависшие на модерации статьи дня — прислать список #id и
+    напомнить, что скоро они уйдут автоматически. Кнопки модерации уже под
+    самими черновиками (Опубликовать/Отмена), новый namespace не нужен.
+    """
+    logger.info("Планировщик: предпросмотр перед автопубликацией")
+    assert _bot is not None
+    bot = _bot
+    try:
+        stuck = await database.get_undelivered_today()
+        if not stuck:
+            logger.info("Предпросмотр: нет статей на модерации — пропуск")
+            return
+        ids = ", ".join(f"#{a['id']}" for a in stuck)
+        try:
+            await bot.send_message(
+                config.ADMIN_CHAT_ID,
+                f"⏳ Через ~{config.PREVIEW_WARN_MINUTES} мин статьи дня уйдут "
+                f"в канал АВТОМАТИЧЕСКИ: {ids}.\n"
+                "Проверь черновики: кнопки ✅ Опубликовать / ⛔ Отмена под ними.",
+            )
+        except Exception:
+            logger.exception("Предпросмотр: не смог уведомить админа")
+    except Exception:
+        logger.exception("Ошибка в джобе предпросмотра")
+
+
 async def _job_comments():
     """Модерация новых комментариев в группе-обсуждении."""
     logger.info("Планировщик: обработка комментариев")
@@ -218,6 +253,35 @@ def start(bot) -> AsyncIOScheduler:
         config.EVENING_DEADLINE_HOUR,
         config.EVENING_DEADLINE_MINUTE,
     )
+
+    # Предпросмотр перед автопубликацией: за PREVIEW_WARN_MINUTES до дедлайнов
+    pw_h1, pw_m1 = _minus_minutes(
+        config.PUBLISH_WINDOW_END, 0, config.PREVIEW_WARN_MINUTES
+    )
+    sched.add_job(
+        _job_preview_warn,
+        CronTrigger(hour=pw_h1, minute=pw_m1),
+        id="preview_warn_day",
+        replace_existing=True,
+        misfire_grace_time=600,
+        coalesce=True,
+    )
+    logger.info("Джоб предпросмотра (день): %02d:%02d", pw_h1, pw_m1)
+
+    pw_h2, pw_m2 = _minus_minutes(
+        config.EVENING_DEADLINE_HOUR,
+        config.EVENING_DEADLINE_MINUTE,
+        config.PREVIEW_WARN_MINUTES,
+    )
+    sched.add_job(
+        _job_preview_warn,
+        CronTrigger(hour=pw_h2, minute=pw_m2),
+        id="preview_warn_evening",
+        replace_existing=True,
+        misfire_grace_time=600,
+        coalesce=True,
+    )
+    logger.info("Джоб предпросмотра (вечер): %02d:%02d", pw_h2, pw_m2)
 
     # Watchdog доставки: через 2 ч после окна публикации (но не позже 23:00)
     wd_hour = min(config.PUBLISH_WINDOW_END + 2, 23)

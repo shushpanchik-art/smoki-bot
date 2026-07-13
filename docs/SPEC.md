@@ -180,6 +180,10 @@ Message|InaccessibleMessage. При /start отправляется ReplyKeyboar
   `find . -path ./venv -prune -o -name __pycache__ -type d -exec rm -rf {} +`.
 - __journalctl__: для свежих логов после рестарта надёжнее `--since` по времени,
   чем `-n50` (последнее может захватить хвост старого процесса).
+- __Heartbeat при старте__: интервальная APScheduler-джоба стартует только
+  через N часов, поэтому после каждого рестарта внешний healthcheck за окно
+  видит пусто и шлёт ложный FAILED. Лечится `next_run_time=datetime.now()`
+  в add_job — первый маркер пишется немедленно при запуске.
 
 ## Эксплуатация: CI troubleshooting
 
@@ -243,9 +247,17 @@ P3 — nice-to-have. Разведка перед реализацией обяз
   Факт разведки: `bot.send_message(config.ADMIN_CHAT_ID, ...)` уже есть
   в scheduler.py (канал алерта готов); `_job_deadline` публикует draft, но
   успех не проверяет.
-- [ ] R2 (P1) Health-heartbeat. Отдельный от бэкапов сигнал «бот жив и цикл
-  работает»: раз в сутки APScheduler-джоба пишет `heartbeat ok` в journald;
-  если за N часов heartbeat нет — алерт. Ловит «процесс жив, scheduler завис».
+- [x] R2 (P1) Health-heartbeat. РЕАЛИЗОВАНО (PR #92/#93). Джоба `_job_heartbeat`
+  в scheduler.py каждые HEARTBEAT_INTERVAL_HOURS (деф. 4) пишет `HEARTBEAT ok`
+  в journald; `next_run_time=datetime.now()` — первый маркер СРАЗУ при старте
+  (иначе внешний healthcheck после рестарта видит пусто и шлёт ложный FAILED).
+  Внешний systemd-timer `smoki-heartbeat.timer` запускает
+  `scripts/heartbeat_healthcheck.sh` (грепает journald на свежесть маркера за
+  HEARTBEAT_MAX_AGE_HOURS, деф. 8); при отсутствии — Telegram-алерт через
+  notify_admin.sh (события heartbeat failed/recovered, анти-дубли state-файлом).
+  Эталоны юнитов: deploy/systemd/smoki-heartbeat.{service,timer}. Тест
+  tests/test_heartbeat.py. Проверено на проде: рестарт → HEARTBEAT ok сразу →
+  healthcheck OK → «✅ heartbeat восстановлен» доходит.
 - [ ] R3 (P2) Ретраи AI с экспоненциальной паузой. Факт разведки: в ai/gemini.py
   есть переключение primary->fallback, но НЕТ retry/backoff внутри клиента.
   Нужны 2-3 повтора при 429/5xx/timeout Vertex + гарантированный fallback.

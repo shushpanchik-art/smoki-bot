@@ -4,11 +4,12 @@
 переключаемся на резервный клиент AI Studio с ключом GEMINI_API_KEY_FALLBACK.
 """
 import logging
+import time
 from typing import TYPE_CHECKING
 
 import config  # noqa: F401  — выполняет load_dotenv() до создания клиента
 from google import genai
-from google.genai import types
+from google.genai import errors, types
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,40 @@ def get_fallback_client() -> genai.Client | None:
     return _fallback
 
 
+_MAX_ATTEMPTS = 3
+_BASE_DELAY = 1.0
+
+
+def _is_transient(err: Exception) -> bool:
+    """5xx или 429 — стоит повторить; прочее — нет."""
+    if isinstance(err, errors.ServerError):
+        return True
+    if isinstance(err, errors.ClientError):
+        return getattr(err, "code", None) == 429
+    return False
+
+
+def _call_with_retry(fn, label):
+    """Повторяет вызов при транзиентных ошибках с экспопаузой."""
+    last: Exception | None = None
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
+        try:
+            return fn()
+        except Exception as e:  # noqa: BLE001
+            last = e
+            if not _is_transient(e) or attempt == _MAX_ATTEMPTS:
+                raise
+            delay = _BASE_DELAY * (2 ** (attempt - 1))
+            logger.warning(
+                "%s: транзиентная ошибка (попытка %d/%d), пауза %.1fs: %s",
+                label, attempt, _MAX_ATTEMPTS, delay, e,
+            )
+            time.sleep(delay)
+    if last:
+        raise last
+    raise RuntimeError("unreachable")
+
+
 def _clients() -> list[tuple[str, genai.Client]]:
     out: list[tuple[str, genai.Client]] = [("primary", get_client())]
     fb = get_fallback_client()
@@ -65,14 +100,17 @@ def generate_text(prompt: str, *, temperature: float = 0.9,
     last_err: Exception | None = None
     for name, client in _clients():
         try:
-            resp = client.models.generate_content(
-                model=config.GEMINI_TEXT_MODEL,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    temperature=temperature,
-                    max_output_tokens=max_output_tokens,
-                    tools=tools,
+            resp = _call_with_retry(
+                lambda c=client: c.models.generate_content(
+                    model=config.GEMINI_TEXT_MODEL,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        temperature=temperature,
+                        max_output_tokens=max_output_tokens,
+                        tools=tools,
+                    ),
                 ),
+                f"generate_text[{name}]",
             )
             if name == "fallback":
                 logger.warning("generate_text: использован резервный ключ")
@@ -150,9 +188,12 @@ def generate_image(prompt: str) -> bytes | None:
     last_err: Exception | None = None
     for name, client in _clients():
         try:
-            resp = client.models.generate_content(
-                model=config.GEMINI_IMAGE_MODEL,
-                contents=prompt,
+            resp = _call_with_retry(
+                lambda c=client: c.models.generate_content(
+                    model=config.GEMINI_IMAGE_MODEL,
+                    contents=prompt,
+                ),
+                f"generate_image[{name}]",
             )
             if not resp.candidates:
                 logger.warning("generate_image через %s: пустой candidates", name)

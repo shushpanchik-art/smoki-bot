@@ -55,3 +55,70 @@ def test_get_client_is_singleton(monkeypatch):
     c2 = gemini.get_client()
     assert c1 is c2
     assert len(created) == 1
+
+
+# --- R3: retry на транзиентных ошибках -------------------------------------
+
+class _FakeServer(gemini.errors.ServerError):
+    def __init__(self):  # noqa: D401 — не зовём тяжёлый APIError.__init__
+        self.code = 500
+
+
+class _FakeClient429(gemini.errors.ClientError):
+    def __init__(self):
+        self.code = 429
+
+
+class _FakeClient400(gemini.errors.ClientError):
+    def __init__(self):
+        self.code = 400
+
+
+def test_is_transient_classification():
+    assert gemini._is_transient(_FakeServer()) is True
+    assert gemini._is_transient(_FakeClient429()) is True
+    assert gemini._is_transient(_FakeClient400()) is False
+    assert gemini._is_transient(ValueError("boom")) is False
+
+
+def test_retry_success_after_transient(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(gemini.time, "sleep", lambda s: sleeps.append(s))
+    calls = {"n": 0}
+
+    def fn():
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise _FakeServer()
+        return "ok"
+
+    assert gemini._call_with_retry(fn, "lbl") == "ok"
+    assert calls["n"] == 3
+    assert len(sleeps) == 2  # две паузы перед 2-й и 3-й попыткой
+
+
+def test_retry_exhausts_and_raises(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(gemini.time, "sleep", lambda s: sleeps.append(s))
+
+    def fn():
+        raise _FakeServer()
+
+    with pytest.raises(gemini.errors.ServerError):
+        gemini._call_with_retry(fn, "lbl")
+    assert len(sleeps) == gemini._MAX_ATTEMPTS - 1
+
+
+def test_no_retry_on_permanent(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(gemini.time, "sleep", lambda s: sleeps.append(s))
+    calls = {"n": 0}
+
+    def fn():
+        calls["n"] += 1
+        raise _FakeClient400()
+
+    with pytest.raises(gemini.errors.ClientError):
+        gemini._call_with_retry(fn, "lbl")
+    assert calls["n"] == 1
+    assert sleeps == []

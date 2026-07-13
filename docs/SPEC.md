@@ -243,9 +243,15 @@ P3 — nice-to-have. Разведка перед реализацией обяз
   Факт разведки: `bot.send_message(config.ADMIN_CHAT_ID, ...)` уже есть
   в scheduler.py (канал алерта готов); `_job_deadline` публикует draft, но
   успех не проверяет.
-- [ ] R2 (P1) Health-heartbeat. Отдельный от бэкапов сигнал «бот жив и цикл
-  работает»: раз в сутки APScheduler-джоба пишет `heartbeat ok` в journald;
-  если за N часов heartbeat нет — алерт. Ловит «процесс жив, scheduler завис».
+- [x] R2 (P1) Health-heartbeat. РЕАЛИЗОВАНО: scheduler.py `_job_heartbeat`
+  (IntervalTrigger каждые HEARTBEAT_INTERVAL_HOURS=6 ч, id="heartbeat",
+  next_run_time=now) пишет маркер `HEARTBEAT ok` в journald. Внешний
+  systemd-timer smoki-heartbeat + scripts/heartbeat_healthcheck.sh грепает
+  journald на свежесть маркера (порог HEARTBEAT_MAX_AGE_HOURS=8) и алертит
+  админу, если бот/scheduler завис (процесс жив, но цикл встал — сам себя не
+  проверит). config: HEARTBEAT_INTERVAL_HOURS, HEARTBEAT_MAX_AGE_HOURS в
+  .env.example. Юниты: deploy/systemd/smoki-heartbeat.service/.timer.
+  Тесты: tests/test_heartbeat.py (джоба зарегистрирована, маркер в лог).
 - [x] R3 (P2) Ретраи AI с экспоненциальной паузой. РЕАЛИЗОВАНО: в ai/gemini.py
   `_call_with_retry` оборачивает вызовы модели — до `_MAX_ATTEMPTS` попыток с
   экспоненциальным backoff; повтор только на транзиентных ошибках

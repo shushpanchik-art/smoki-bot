@@ -197,13 +197,33 @@ async def cb_adm_gen(cq: CallbackQuery, state: FSMContext):
 
 
 @router.message(ModerationStates.waiting_custom_topic)
-async def fb_custom_topic(message: Message, bot: Bot, state: FSMContext):
+async def fb_custom_topic(message: Message, state: FSMContext):
     if not _is_admin(message):
         return
-    await state.clear()
     raw = (message.text or "").strip()
     topic = None if raw in ("", "-") else raw
-    await _do_generate(message, bot, "", topic=topic)
+    await state.update_data(custom_topic=topic)
+    await state.set_state(ModerationStates.waiting_custom_length)
+    await message.answer(
+        "\U0001F4CF Сколько слов? Отправь число (200-500) "
+        "или <code>-</code> — стандартная длина."
+    )
+
+
+@router.message(ModerationStates.waiting_custom_length)
+async def fb_custom_length(message: Message, bot: Bot, state: FSMContext):
+    if not _is_admin(message):
+        return
+    data = await state.get_data()
+    topic = data.get("custom_topic")
+    await state.clear()
+    raw = (message.text or "").strip()
+    length_hint = None
+    if raw not in ("", "-"):
+        digits = "".join(c for c in raw if c.isdigit())
+        if digits:
+            length_hint = prompts.words_rule(int(digits))
+    await _do_generate(message, bot, "", topic=topic, length_hint=length_hint)
 
 
 @router.callback_query(F.data == "adm_gen_m")
@@ -450,23 +470,27 @@ async def cmd_start(message: Message):
 
 
 async def _do_generate(message: Message, bot: Bot, fmt: str = "",
-                       topic: str | None = None):
-    length_hint = None
-    if fmt == "morning":
+                       topic: str | None = None,
+                       length_hint: str | None = None):
+    if length_hint is None and fmt == "morning":
         n_max = int(await db.get_setting(
             "morning_facts", str(config.MORNING_LEN_DEFAULT))
             or config.MORNING_LEN_DEFAULT)
         n = random.randint(1, max(1, n_max))
         length_hint = prompts.facts_rules(n)
         await message.answer(f"⏳ Утренний формат ({n} факт(ов))…")
-    elif fmt == "evening":
+    elif length_hint is None and fmt == "evening":
         w = int(await db.get_setting(
             "evening_words", str(config.EVENING_WORDS_DEFAULT))
             or config.EVENING_WORDS_DEFAULT)
         length_hint = prompts.words_rule(w)
         await message.answer(f"⏳ Вечерний лонг-рид (~{w} слов)…")
-    else:
+    elif length_hint is None:
         await message.answer("⏳ Генерирую черновик, подожди ~30-60 сек…")
+    else:
+        await message.answer(
+            "⏳ Генерирую по теме своей длины, подожди ~30-60 сек…"
+        )
     try:
         res = await content.generate_article(topic=topic, length_hint=length_hint)
     except Exception as e:

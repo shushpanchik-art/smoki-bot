@@ -280,8 +280,13 @@ P3 — nice-to-have. Разведка перед реализацией обяз
   тесты tests/test_minus_minutes.py.
 - [ ] U3 (P3) Кнопка «показать последние N комментов и ответы бота» в панели —
   прозрачность автомодерации (сейчас видно только через журналы группы).
-- [ ] U4 (P2, = #10) Уточнение ДЛИНЫ своей темы через FSM
-  (`waiting_custom_length`) после ввода темы. Ввод темы уже реализован.
+- [x] U4 (P2, = #10) Уточнение ДЛИНЫ своей темы через FSM. РЕАЛИЗОВАНО
+  (PR test/u4-custom-length): цепочка cb_adm_gen -> waiting_custom_topic
+  (fb_custom_topic) -> waiting_custom_length (fb_custom_length) в
+  handlers/admin.py. Число 200-500 -> prompts.words_rule -> length_hint
+  в _do_generate; `-`/пусто -> стандартная длина. Тесты:
+  tests/test_u4_custom_length.py (переход FSM, парсинг числа, дефолт,
+  игнор не-админа).
 
 ### C. Безопасность / эксплуатация
 

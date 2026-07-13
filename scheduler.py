@@ -56,29 +56,44 @@ async def _job_evening():
 
 
 async def _job_deadline():
-    """Дедлайн окна публикации: если статья на модерации висит — публикуем сами."""
+    """Дедлайн: публикуем ВСЕ зависшие на модерации статьи дня."""
     logger.info("Планировщик: проверка дедлайна публикации")
     assert _bot is not None
     bot = _bot
     try:
-        art = await database.get_latest_pending_article()
-        if not art:
+        stuck = await database.get_undelivered_today()
+        if not stuck:
             logger.info("Дедлайн: нет статей на модерации — пропуск")
             return
-        aid = art["id"]
-        res = await publisher.publish_article(bot, aid)
-        if res.get("ok"):
-            logger.info("Дедлайн: статья #%s опубликована автоматически", aid)
-            try:
-                await bot.send_message(
-                    config.ADMIN_CHAT_ID,
-                    f"⏰ Статья #{aid} опубликована автоматически "
-                    f"(истёк срок модерации)."
+        published: list[int] = []
+        failed: list[int] = []
+        for art in stuck:
+            aid = art["id"]
+            res = await publisher.publish_article(bot, aid)
+            if res.get("ok"):
+                published.append(aid)
+                logger.info("Дедлайн: статья #%s опубликована автоматически", aid)
+            else:
+                failed.append(aid)
+                logger.warning(
+                    "Дедлайн: ошибка публикации #%s: %s", aid, res.get("error")
                 )
+        parts: list[str] = []
+        if published:
+            parts.append(
+                "⏰ Опубликованы автоматически (истёк срок модерации): "
+                + ", ".join(f"#{i}" for i in published)
+            )
+        if failed:
+            parts.append(
+                "⚠️ НЕ удалось опубликовать: "
+                + ", ".join(f"#{i}" for i in failed)
+            )
+        if parts:
+            try:
+                await bot.send_message(config.ADMIN_CHAT_ID, "\n".join(parts))
             except Exception:
                 pass
-        else:
-            logger.warning("Дедлайн: ошибка публикации #%s: %s", aid, res.get("error"))
     except Exception:
         logger.exception("Ошибка в дедлайн-джобе")
 
@@ -174,6 +189,24 @@ def start(bot) -> AsyncIOScheduler:
         replace_existing=True,
     )
     logger.info("Джоб дедлайна публикации: %02d:00", config.PUBLISH_WINDOW_END)
+
+    # Вечерний дедлайн: добить вечерний лонг-рид тем же вечером
+    sched.add_job(
+        _job_deadline,
+        CronTrigger(
+            hour=config.EVENING_DEADLINE_HOUR,
+            minute=config.EVENING_DEADLINE_MINUTE,
+        ),
+        id="publish_deadline_evening",
+        replace_existing=True,
+        misfire_grace_time=3600,
+        coalesce=True,
+    )
+    logger.info(
+        "Джоб вечернего дедлайна: %02d:%02d",
+        config.EVENING_DEADLINE_HOUR,
+        config.EVENING_DEADLINE_MINUTE,
+    )
 
     # Watchdog доставки: через 2 ч после окна публикации (но не позже 23:00)
     wd_hour = min(config.PUBLISH_WINDOW_END + 2, 23)

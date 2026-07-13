@@ -1,0 +1,13 @@
+[Unit]
+Description=SMOKI daily backup summary notification to Telegram
+Documentation=file:/opt/SMOKI/bot/scripts/notify_admin.sh
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=BOT_DIR=/opt/SMOKI/bot
+ExecStart=/opt/SMOKI/bot/scripts/notify_admin.sh daily-summary
+
+[Install]
+WantedBy=multi-user.target

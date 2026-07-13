@@ -1,0 +1,9 @@
+[Unit]
+Description=SMOKI daily backup summary at 23:45 MSK
+
+[Timer]
+OnCalendar=*-*-* 23:45:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

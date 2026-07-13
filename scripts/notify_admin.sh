@@ -148,8 +148,73 @@ case "$EVENT" in
             log "OK: backup-ok отправлен"
         else exit $?; fi
         ;;
+    daily-summary)
+        read_credentials
+        TODAY="$(date '+%Y-%m-%d')"
+        TODAY_HUMAN="$(date '+%d.%m.%Y')"
+        LOCAL_DB_DIR="${LOCAL_DB_DIR:-/var/backups/smoki}"
+        OFFSITE_LOG="${OFFSITE_LOG:-/opt/SMOKI/bot/logs/backup-offsite.log}"
+        FULL_LOG="${FULL_LOG:-/opt/SMOKI/bot/logs/backup-full-offsite.log}"
+
+        human_size() {
+            local b="$1"
+            if [ -z "$b" ] || [ "$b" -lt 1024 ] 2>/dev/null; then echo "${b:-0} Б"; return; fi
+            awk -v b="$b" 'BEGIN{
+                split("Б КБ МБ ГБ ТБ",u," ");
+                i=1; while(b>=1024 && i<5){b/=1024; i++}
+                printf "%.1f %s", b, u[i]
+            }'
+        }
+
+        # 1) Локальный smoki.db — свежайший файл за сегодня
+        LOCAL_FILE="$(find "$LOCAL_DB_DIR" -maxdepth 1 -name 'smoki_*.db' -type f -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 | awk '{print $2}')"
+        if [ -n "$LOCAL_FILE" ] && [ "$(date -r "$LOCAL_FILE" '+%Y-%m-%d')" = "$TODAY" ]; then
+            LSIZE="$(human_size "$(stat -c %s "$LOCAL_FILE")")"
+            LTIME="$(date -r "$LOCAL_FILE" '+%H:%M %d.%m')"
+            LOCAL_LINE="✅ ok, ${LSIZE}, ${LTIME}"
+            LOCAL_OK=1
+        else
+            LOCAL_LINE="❌ сегодня не выполнялся"
+            LOCAL_OK=0
+        fi
+
+        # 2) Offsite smoki.db — строка OK за сегодня
+        OFF_MATCH="$(grep -E "^\[$TODAY .*OK: offsite backup complete" "$OFFSITE_LOG" 2>/dev/null | tail -1)"
+        if [ -n "$OFF_MATCH" ]; then
+            OTIME="$(echo "$OFF_MATCH" | sed -E 's/^\[[0-9-]+ ([0-9:]+).*/\1/')"
+            OFF_LINE="✅ ok, ${OTIME} ${TODAY_HUMAN}"
+            OFF_OK=1
+        else
+            OFF_LINE="❌ сегодня не выполнялся"
+            OFF_OK=0
+        fi
+
+        # 3) Full offsite — строка OK (N bytes) за сегодня
+        FULL_MATCH="$(grep -E "^\[$TODAY .*OK: full-offsite backup complete" "$FULL_LOG" 2>/dev/null | tail -1)"
+        if [ -n "$FULL_MATCH" ]; then
+            FTIME="$(echo "$FULL_MATCH" | sed -E 's/^\[[0-9-]+ ([0-9:]+).*/\1/')"
+            FBYTES="$(echo "$FULL_MATCH" | sed -E 's/.*\(([0-9]+) bytes\).*/\1/')"
+            FSIZE="$(human_size "$FBYTES")"
+            FULL_LINE="✅ ok, ${FSIZE}, ${FTIME} ${TODAY_HUMAN}"
+            FULL_OK=1
+        else
+            FULL_LINE="❌ сегодня не выполнялся"
+            FULL_OK=0
+        fi
+
+        if [ "$LOCAL_OK" = 1 ] && [ "$OFF_OK" = 1 ] && [ "$FULL_OK" = 1 ]; then
+            HEADER="📦 *Бэкапы за сутки (${TODAY_HUMAN})*"
+        else
+            HEADER="⚠️ *Бэкапы за сутки (${TODAY_HUMAN}) — есть проблемы*"
+        fi
+        TEXT="${HEADER}
+• Локальный smoki.db (на сервере): ${LOCAL_LINE}
+• Offsite smoki.db (Я.Диск): ${OFF_LINE}
+• Offsite полный (Я.Диск): ${FULL_LINE}"
+        send_telegram "$TEXT" || exit $?
+        ;;
     *)
-        log "ERROR: неизвестное событие: '$EVENT'. Допустимо: backup-failed, backup-recovered, backup-ok, offsite-failed, offsite-recovered, offsite-full-failed, offsite-full-recovered"
+        log "ERROR: неизвестное событие: '$EVENT'. Допустимо: backup-failed, backup-recovered, backup-ok, offsite-failed, offsite-recovered, offsite-full-failed, offsite-full-recovered, daily-summary"
         exit 2
         ;;
 esac

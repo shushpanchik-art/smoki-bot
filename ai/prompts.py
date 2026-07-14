@@ -283,3 +283,66 @@ def image_prompt_from_scene(scene: str, topic: str) -> str:
         "Stylish, cinematic, magazine cover quality. "
         "No logos, no watermarks, no people's faces in focus."
     )
+
+
+# ===== U6.2/U6.3: Stories =====
+STORY_THEMES = {
+    1: "остроумная короткая шутка про культуру курения",
+    2: "свежая новость индустрии (вейпы, кальяны, табак, регулирование)",
+    3: "новинки рынка: устройства, вкусы, бренды (нейтрально, без рекламы)",
+    4: "любопытный факт из истории или культуры курения",
+    5: "доброе пожелание подписчикам канала",
+}
+
+
+def story_text_prompt(theme: int, search_snippet: str = "") -> str:
+    """Текст для сторис канала @SMOKTOLK. Короткий, без призывов."""
+    topic = STORY_THEMES.get(theme, STORY_THEMES[4])
+    base = (
+        "Ты ведёшь Telegram-канал @SMOKTOLK о культуре курения "
+        "(вейпы, кальяны, табак). Составь ОЧЕНЬ короткий текст для Stories "
+        f"на тему: {topic}. "
+        "15-40 слов, живой разговорный тон, 1-2 эмодзи. "
+        "Никаких призывов покупать/курить, никаких медсоветов. "
+        "Верни только сам текст сторис, без пояснений.\n\n"
+        + CENSOR_RULES
+    )
+    if search_snippet:
+        base += f"\n\nОпирайся на актуальные данные:\n{search_snippet[:1500]}"
+    return base
+
+
+def story_flood_caption_prompt(theme: int, search_snippet: str = "") -> str:
+    """Подпись для реюза картинки во flood-группе: интересный факт 20-50 слов."""
+    topic = STORY_THEMES.get(theme, STORY_THEMES[4])
+    base = (
+        "Напиши интересный факт по теме "
+        f"«{topic}» для подписи к сторис. "
+        "Строго 20-50 слов, познавательно, без призывов покупать/курить, "
+        "без медсоветов. 1 эмодзи допустимо. Верни только текст.\n\n"
+        + CENSOR_RULES
+    )
+    if search_snippet:
+        base += f"\n\nАктуальные данные:\n{search_snippet[:1500]}"
+    return base
+
+
+def story_image_prompt(scene: str) -> str:
+    """NanoBanana-промпт для вертикальной сторис 9:16 (1080x1920).
+
+    В отличие от постов, здесь ТЕКСТ на картинке РАЗРЕШЁН и на русском —
+    крупный, читаемый, без артефактов.
+    """
+    scene = " ".join(scene.split())[:400]
+    return (
+        "Vertical Stories format, portrait 9:16 aspect ratio, 1080x1920 pixels. "
+        "The image MUST fill the entire vertical frame edge to edge - "
+        "no black bars, no white bars, no borders, no letterboxing. "
+        f"Scene: {scene} "
+        "Theme: smoking culture (vapes, hookah, tobacco), stylish, cinematic, "
+        "modern social-media Stories aesthetic, vivid colours. "
+        "If any text is shown, it MUST be in correct RUSSIAN, large, "
+        "highly legible, clean sans-serif, perfectly spelled, no gibberish, "
+        "no distorted letters, no artefacts. "
+        "No logos, no watermarks, no faces in sharp focus."
+    )

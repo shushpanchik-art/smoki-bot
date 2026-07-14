@@ -3,6 +3,12 @@ title = "SMOKI gitleaks config"
 [extend]
 useDefault = true
 
+[[rules]]
+id = "telegram-bot-token"
+description = "Telegram Bot API token"
+regex = '''(?i)(?:bot[_-]?token\s*[:=]\s*)?[0-9]{8,10}:[A-Za-z0-9_-]{35}'''
+keywords = ["bot", "token"]
+
 [allowlist]
 description = "Ignore local venv, data, placeholders and env example"
 paths = [

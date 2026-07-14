@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# SMOKI local pre-commit hook: gitleaks secret scan of staged changes.
+# Установка: bash scripts/install-hooks.sh
+# Совпадает с CI-джобой gitleaks (тот же .gitleaks.toml).
+set -euo pipefail
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+    echo "pre-commit: gitleaks не установлен — пропускаю проверку секретов." >&2
+    echo "pre-commit: установить https://github.com/gitleaks/gitleaks" >&2
+    exit 0
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+CONFIG="$REPO_ROOT/.gitleaks.toml"
+
+ARGS=(protect --staged --no-banner --redact)
+if [ -f "$CONFIG" ]; then
+    ARGS+=(--config "$CONFIG")
+fi
+
+if ! gitleaks "${ARGS[@]}"; then
+    echo "" >&2
+    echo "pre-commit: ОБНАРУЖЕН потенциальный секрет в staged-изменениях." >&2
+    echo "pre-commit: коммит отклонён. Убери секрет или добавь allowlist в .gitleaks.toml." >&2
+    echo "pre-commit: осознанно пропустить один раз: git commit --no-verify" >&2
+    exit 1
+fi

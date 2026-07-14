@@ -138,7 +138,6 @@ def image_prompt(topic: str) -> str:
         "no signage, no typography, no writing. Book spines and labels "
         "must be blank or blurred with no readable characters. "
         "This is a purely visual wordless photographic illustration. "
-        "Wide horizontal landscape orientation, 3:2 aspect ratio (clearly wider than tall). "
         "The scene must FILL THE ENTIRE FRAME edge to edge — "
         "absolutely NO white bars, NO black bars, NO borders, NO empty margins, "
         "NO letterboxing, NO padding; the subject and background "
@@ -238,6 +237,20 @@ def words_rule(words: int) -> str:
     )
 
 
+def custom_words_rule(words: int | None, default: int = 150) -> str:
+    """Статья по заказу: верхний лимит слов, без нижней границы."""
+    n = default if not words or words < 1 else min(words, 800)
+    return (
+        "ФОРМАТ ПО ЗАКАЗУ. Это указание об объёме ПОЛНОСТЬЮ ОТМЕНЯЕТ "
+        "любые прежние правила длины. ОБЯЗАТЕЛЬНО перепроверь длину "
+        "перед ответом:\n"
+        f"- Объём: НЕ БОЛЕЕ {n} слов (no more than {n} words). "
+        "Можно короче, но НЕ длиннее.\n"
+        "- Пиши строго по заданной теме/заданию пользователя.\n"
+        "- Тон: живой, познавательный, по делу."
+    )
+
+
 def image_scene_prompt(body: str) -> str:
     """LLM извлекает из статьи короткое EN-описание визуальной сцены."""
     snippet = body[:1500]
@@ -260,8 +273,6 @@ def image_prompt_from_scene(scene: str, topic: str) -> str:
         "no signage, no typography, no writing. Book spines and labels "
         "must be blank or blurred with no readable characters. "
         "This is a purely visual wordless photographic illustration. "
-        "Wide horizontal landscape orientation, 3:2 aspect ratio "
-        "(clearly wider than tall). "
         "The scene must FILL THE ENTIRE FRAME edge to edge - "
         "absolutely NO white bars, NO black bars, NO borders, NO empty margins, "
         "NO letterboxing, NO padding; the subject and background "

@@ -149,8 +149,8 @@ def _trim_borders(img: "PILImage", tol: int = 12) -> "PILImage":
     return img.crop(bbox)
 
 
-def _crop_landscape(data: bytes, ratio: float = 3 / 2) -> bytes:
-    """Центральный кроп PNG под горизонтальный формат (по умолчанию 3:2).
+def _crop_landscape(data: bytes, ratio: float = 4 / 5) -> bytes:
+    """Центральный кроп PNG под портретный формат (по умолчанию 4:5).
 
     flash-image всегда отдаёт квадрат 1024x1024; SDK не умеет aspect_ratio,
     поэтому режем сами. Сначала срезаем однотонные поля (white/black bars),

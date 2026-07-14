@@ -289,8 +289,23 @@ P3 — nice-to-have. Разведка перед реализацией обяз
   существующими кнопками ✅ Опубликовать / ⛔ Отмена под черновиками
   (новый namespace не вводился осознанно). Хелпер `_minus_minutes` +
   тесты tests/test_minus_minutes.py.
-- [ ] U3 (P3) Кнопка «показать последние N комментов и ответы бота» в панели —
-  прозрачность автомодерации (сейчас видно только через журналы группы).
+- [x] U3 (P3) Кнопка «💬 Комментарии» в панели. РЕАЛИЗОВАНО:
+  db.get_recent_comments(N) + inline-кнопка `adm_comments`
+  (handlers/admin.py cb_adm_comments) показывает последние 10 комментов
+  с классом ИИ и ответом бота; при пустой таблице — «Комментариев пока нет».
+  Прозрачность автомодерации без чтения журналов группы.
+- [ ] U5 (P2) Image-prompt из ТЕКСТА статьи. Проблема (прод, скриншоты):
+  картинки однотипны — `prompts.image_prompt(topic)` строит сцену
+  детерминированно (hash темы -> _IMG_SCENES/_IMG_PALETTES), поэтому
+  одинаковая/близкая тема -> одинаковая картинка, тем немного -> повтор.
+  Фикс: после цензуры (services/content.py, до блока img_prompt=...) шаг
+  ИИ генерит краткое EN-описание сцены по телу статьи `body`
+  (новый prompts.image_scene_from_text(body) + gemini.generate_text,
+  use_search=False); описание подставляется в image_prompt вместо
+  hash-сцены/topic. Жёсткие constraints (NO TEXT, 3:2, fill frame, no logos)
+  сохранить. Фолбэк на текущий image_prompt(topic) при пустом ответе ИИ.
+  Тест tests/test_image_scene.py. Отдельный PR (код).
+
 - [x] U4 (P2, = #10) Уточнение ДЛИНЫ своей темы через FSM. РЕАЛИЗОВАНО
   (PR test/u4-custom-length): цепочка cb_adm_gen -> waiting_custom_topic
   (fb_custom_topic) -> waiting_custom_length (fb_custom_length) в

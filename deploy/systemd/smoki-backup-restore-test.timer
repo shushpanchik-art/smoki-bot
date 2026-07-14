@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly SMOKI backup restore-test (Mon 04:17 MSK)
+
+[Timer]
+OnCalendar=Mon *-*-* 04:17:00
+Persistent=true
+RandomizedDelaySec=5min
+Unit=smoki-backup-restore-test.service
+
+[Install]
+WantedBy=timers.target

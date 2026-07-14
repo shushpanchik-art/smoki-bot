@@ -340,6 +340,8 @@ P3 — nice-to-have. Разведка перед реализацией обяз
 
 ### U6.2 Канал @SMOKTOLK (генерация новых сторис)
 
+- [x] Промпты и конфиг РЕАЛИЗОВАНЫ (feature/u6.2a-story-config-prompts): `ai/prompts.STORY_THEMES`, `story_text_prompt`, `story_flood_caption_prompt`, `story_image_prompt` (9:16, 1080x1920, текст на русском разрешён); веса/лимиты/таймаут в `config.py` (`STORY_WEIGHT_*`, `STORY_CHANNEL_MIN/MAX_PER_DAY`, `STORY_FLOOD_MIN/MAX_PER_DAY`, `STORY_APPROVE_TIMEOUT_MIN`). Тест `tests/test_story_prompts.py`. TODO (U6.2b): задачник-планировщик слотов, генерация картинок, запись в `story_jobs`.
+
 - 3-7 сторис в день (случайно), слоты пишутся в задачник ежедневно.
 - Выбор темы по весам: шутка 15% / новость 25% / новинки 25% /
   факт 30% / пожелание 5%.
@@ -376,3 +378,13 @@ P3 — nice-to-have. Разведка перед реализацией обяз
   (иначе `test_env_example` в CI упадёт, если config их читает).
 - Файл сессии `*.session` -> в `.gitignore`; путь сессии -> в `bandit -x`.
 - requirements: `telethon`.
+- `.env`/`.env.example` дополнены (U6.2a): `STORY_WEIGHT_JOKE`, `STORY_WEIGHT_NEWS`, `STORY_WEIGHT_NEW_PRODUCTS`, `STORY_WEIGHT_FACT`, `STORY_WEIGHT_WISH`, `STORY_CHANNEL_MIN_PER_DAY`, `STORY_CHANNEL_MAX_PER_DAY`, `STORY_FLOOD_MIN_PER_DAY`, `STORY_FLOOD_MAX_PER_DAY`, `STORY_APPROVE_TIMEOUT_MIN` (значения = дефолты config).
+
+### U7 — Формат картинки поста (открытый вопрос)
+
+- Сейчас `ai/gemini._crop_landscape(ratio=4/5)` центрально кропает
+  1024x1024 в портрет 4:5. NanoBanana всегда отдаёт квадрат, SDK не умеет
+  `aspect_ratio`.
+- TODO: решить, оставить 4:5 или вернуть квадрат 1024x1024. Откат =
+  вызвать `_crop_landscape(data, ratio=1)` либо отдать оригинал без кропа
+  в `ai/gemini.py` (строка ~206). Требует подтверждения владельца.

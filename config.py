@@ -83,3 +83,18 @@ TG_USERBOT_PHONE = os.getenv("TG_USERBOT_PHONE", "")
 TG_SESSION_PATH = os.getenv("TG_SESSION_PATH", "/opt/SMOKI/bot/userbot.session")
 STORY_FLOOD_CHANNEL = os.getenv("STORY_FLOOD_CHANNEL", "@smoktolk_flood")
 STORY_MAX_REGEN = _int("STORY_MAX_REGEN", 3)
+
+# ===== U6.2/U6.3: планирование Stories =====
+# Веса выбора темы канала: шутка/новость/новинки/факт/пожелание
+STORY_WEIGHT_JOKE = _int("STORY_WEIGHT_JOKE", 15)
+STORY_WEIGHT_NEWS = _int("STORY_WEIGHT_NEWS", 25)
+STORY_WEIGHT_NEW_PRODUCTS = _int("STORY_WEIGHT_NEW_PRODUCTS", 25)
+STORY_WEIGHT_FACT = _int("STORY_WEIGHT_FACT", 30)
+STORY_WEIGHT_WISH = _int("STORY_WEIGHT_WISH", 5)
+# Сколько сторис в день (случайно в диапазоне)
+STORY_CHANNEL_MIN_PER_DAY = _int("STORY_CHANNEL_MIN_PER_DAY", 3)
+STORY_CHANNEL_MAX_PER_DAY = _int("STORY_CHANNEL_MAX_PER_DAY", 7)
+STORY_FLOOD_MIN_PER_DAY = _int("STORY_FLOOD_MIN_PER_DAY", 5)
+STORY_FLOOD_MAX_PER_DAY = _int("STORY_FLOOD_MAX_PER_DAY", 12)
+# Тишина админа до автопубликации сторис (минуты)
+STORY_APPROVE_TIMEOUT_MIN = _int("STORY_APPROVE_TIMEOUT_MIN", 60)

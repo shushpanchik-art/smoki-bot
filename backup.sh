@@ -62,6 +62,14 @@ trap cleanup EXIT
 sqlite3 "$DB_PATH" ".backup '$TMP_SNAPSHOT'" || die "sqlite3 .backup упал"
 [ -s "$TMP_SNAPSHOT" ] || die "временный снимок пустой"
 
+# R5: проверка целостности снимка ДО того как он станет бэкапом.
+# Ловит коррупцию БД раньше, чем она уедет в архив.
+INTEGRITY="$(sqlite3 "$TMP_SNAPSHOT" 'PRAGMA integrity_check;' 2>&1 | head -1)"
+if [ "$INTEGRITY" != "ok" ]; then
+    die "integrity_check провален: $INTEGRITY"
+fi
+log "integrity_check: ok"
+
 NEW_HASH="$(sqlite3 "$TMP_SNAPSHOT" .dump | sha256sum | awk '{print $1}')"
 [ -n "$NEW_HASH" ] || die "не удалось посчитать хеш дампа"
 

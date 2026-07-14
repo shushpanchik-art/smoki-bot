@@ -1,0 +1,18 @@
+[Unit]
+Description=SMOKI weekly backup restore-test (integrity + tables verification)
+Documentation=file:/opt/SMOKI/bot/scripts/backup_restore_test.sh
+After=smoki-backup.service
+
+[Service]
+Type=oneshot
+Environment=BOT_DIR=/opt/SMOKI/bot
+ExecStart=/opt/SMOKI/bot/scripts/backup_restore_test.sh
+StandardOutput=append:/opt/SMOKI/bot/logs/backup-restore-test.log
+StandardError=append:/opt/SMOKI/bot/logs/backup-restore-test.log
+TimeoutStartSec=10min
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+[Install]
+WantedBy=multi-user.target

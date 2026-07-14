@@ -25,6 +25,7 @@ BACKUP_STATE_FILE="${BACKUP_STATE_DIR}/failed"
 OFFSITE_STATE_FILE="${BACKUP_STATE_DIR}/offsite-failed"
 OFFSITE_FULL_STATE_FILE="${BACKUP_STATE_DIR}/offsite-full-failed"
 HEARTBEAT_STATE_FILE="${BACKUP_STATE_DIR}/heartbeat-failed"
+RESTORE_TEST_STATE_FILE="${BACKUP_STATE_DIR}/restore-test-failed"
 
 log() { logger -t "$LOG_TAG" -- "$*" 2>/dev/null || true; echo "[$LOG_TAG] $*"; }
 
@@ -107,6 +108,28 @@ case "$EVENT" in
         TEXT="✅ *SMOKI offsite backup восстановлен*
 Очередная отправка на Я.Диск прошла успешно."
         if send_telegram "$TEXT"; then rm -f "$OFFSITE_STATE_FILE"; log "OK: offsite state-файл удалён"; else exit $?; fi
+        ;;
+    restore-test-failed)
+        ensure_backup_state_dir
+        if [ -e "$RESTORE_TEST_STATE_FILE" ]; then
+            log "INFO: restore-test state-файл уже есть — пропускаю"; exit 0
+        fi
+        read_credentials
+        touch "$RESTORE_TEST_STATE_FILE"; chown "$BACKUP_OWNER" "$RESTORE_TEST_STATE_FILE" 2>/dev/null || true
+        TEXT="🚨 *SMOKI restore-test FAILED*
+Проверка восстановления бэкапа упала — бэкапы могут быть битыми!
+Лог: \`/opt/SMOKI/bot/logs/backup-restore-test.log\`
+Проверь: \`systemctl status smoki-backup-restore-test\`"
+        send_telegram "$TEXT" || exit $?
+        ;;
+    restore-test-recovered)
+        if [ ! -e "$RESTORE_TEST_STATE_FILE" ]; then
+            log "INFO: restore-test state-файл отсутствует — RECOVERED не нужен"; exit 0
+        fi
+        read_credentials
+        TEXT="✅ *SMOKI restore-test восстановлен*
+Проверка восстановления бэкапа снова проходит успешно."
+        if send_telegram "$TEXT"; then rm -f "$RESTORE_TEST_STATE_FILE"; log "OK: restore-test state-файл удалён"; else exit $?; fi
         ;;
     offsite-full-failed)
         ensure_backup_state_dir

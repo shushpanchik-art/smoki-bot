@@ -260,11 +260,22 @@ P3 — nice-to-have. Разведка перед реализацией обяз
   пробрасываются сразу. Переключение primary->fallback сохранено. Тесты:
   tests/test_gemini.py (классификация, успех после повтора, исчерпание, без
   повтора на перманентной).
-- [ ] R4 (P2) Проверка целостности бэкапов (restore-test). Бэкапы делаются и
-  шлётся «backup OK», но восстановление не проверялось. Раз в неделю:
-  развернуть дамп в temp, `PRAGMA integrity_check`, отчёт админу.
-- [ ] R5 (P3) `PRAGMA integrity_check` перед бэкапом smoki.db — ловит коррупцию
-  БД до того, как она уедет в бэкап.
+- [x] R4 (P2) Проверка целостности бэкапов (restore-test). РЕАЛИЗОВАНО
+  (feature/r4-r5-restore-test-integrity): `scripts/backup_restore_test.sh` раз
+  в неделю берёт свежий бэкап из /var/backups/smoki, восстанавливает во
+  временный файл, гоняет `PRAGMA integrity_check` и проверяет наличие всех
+  таблиц (articles и др.), пишет отчёт в logs/backup-restore-test.log
+  (`restore-test ok: integrity=ok, ... articles=N`). Юниты
+  smoki-backup-restore-test.service/.timer (Mon 04:17 MSK, Persistent=true,
+  After=smoki-backup.service) — эталоны в deploy/systemd/. Алерты админу через
+  notify_admin.sh (restore-test-failed/-recovered, анти-дубли state-файлом
+  /var/lib/smoki-backup/restore-test-failed). Проверено на проде: status=0,
+  integrity=ok, articles=39.
+- [x] R5 (P3) `PRAGMA integrity_check` перед бэкапом smoki.db — РЕАЛИЗОВАНО
+  (feature/r4-r5-restore-test-integrity): backup.sh после `sqlite3 .backup`
+  во временный снимок гоняет `PRAGMA integrity_check` ДО архивации; при
+  результате != "ok" — die (бэкап не создаётся, ошибка в лог/алерт). Ловит
+  коррупцию БД раньше, чем она уедет в архив.
 
 ### B. Пользовательский опыт (админ)
 

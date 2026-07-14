@@ -294,7 +294,7 @@ P3 — nice-to-have. Разведка перед реализацией обяз
   (handlers/admin.py cb_adm_comments) показывает последние 10 комментов
   с классом ИИ и ответом бота; при пустой таблице — «Комментариев пока нет».
   Прозрачность автомодерации без чтения журналов группы.
-- [ ] U5 (P2) Image-prompt из ТЕКСТА статьи. Проблема (прод, скриншоты):
+- [x] U5 (P2) Image-prompt из ТЕКСТА статьи. РЕАЛИЗОВАНО (feature/u5-image-scene-from-text): в services/content.generate_article после цензуры шаг ИИ (_text(prompts.image_scene_prompt(body))) генерит EN-описание сцены по телу статьи, оно идёт в prompts.image_prompt_from_scene(scene, topic); фолбэк на prompts.image_prompt(topic) при пустом ответе/ошибке. Constraints (NO TEXT, 3:2) сохранены. Тест tests/test_image_scene.py. Историческое описание проблемы: Проблема (прод, скриншоты):
   картинки однотипны — `prompts.image_prompt(topic)` строит сцену
   детерминированно (hash темы -> _IMG_SCENES/_IMG_PALETTES), поэтому
   одинаковая/близкая тема -> одинаковая картинка, тем немного -> повтор.

@@ -98,3 +98,5 @@ STORY_FLOOD_MIN_PER_DAY = _int("STORY_FLOOD_MIN_PER_DAY", 5)
 STORY_FLOOD_MAX_PER_DAY = _int("STORY_FLOOD_MAX_PER_DAY", 12)
 # Тишина админа до автопубликации сторис (минуты)
 STORY_APPROVE_TIMEOUT_MIN = _int("STORY_APPROVE_TIMEOUT_MIN", 60)
+# Час дня, когда планировщик раскладывает дневные story-слоты
+STORY_PLAN_HOUR = _int("STORY_PLAN_HOUR", 8)

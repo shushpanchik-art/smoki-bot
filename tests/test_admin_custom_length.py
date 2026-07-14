@@ -1,7 +1,7 @@
-"""FSM: своя тема + своя длина (U4).
+"""FSM: своя тема + длина в одном сообщении (U4, одношаговый контракт).
 
-fb_custom_topic сохраняет тему и переходит в waiting_custom_length;
-fb_custom_length парсит число слов в length_hint и запускает генерацию.
+fb_custom_topic принимает тему и (опционально) длину в одном сообщении,
+формирует length_hint через prompts.custom_words_rule и запускает генерацию.
 """
 from unittest.mock import AsyncMock, MagicMock
 
@@ -29,6 +29,9 @@ class _FakeState:
     async def get_data(self):
         return dict(self._data)
 
+    async def get_state(self):
+        return self._state
+
     async def set_state(self, st):
         self._state = st
 
@@ -38,29 +41,7 @@ class _FakeState:
 
 
 @pytest.mark.asyncio
-async def test_custom_topic_asks_length(monkeypatch):
-    msg = _admin_msg(monkeypatch, "Кальян и здоровье")
-    state = _FakeState()
-
-    await admin.fb_custom_topic(msg, state)
-
-    assert state._data["custom_topic"] == "Кальян и здоровье"
-    assert state._state is admin.ModerationStates.waiting_custom_length
-    msg.answer.assert_awaited()
-
-
-@pytest.mark.asyncio
-async def test_custom_topic_dash_no_topic(monkeypatch):
-    msg = _admin_msg(monkeypatch, "-")
-    state = _FakeState()
-
-    await admin.fb_custom_topic(msg, state)
-
-    assert state._data["custom_topic"] is None
-
-
-@pytest.mark.asyncio
-async def test_custom_length_number_builds_hint(monkeypatch):
+async def test_custom_topic_with_length(monkeypatch):
     captured = {}
 
     async def fake_do(message, bot, fmt="", topic=None, length_hint=None):
@@ -68,32 +49,45 @@ async def test_custom_length_number_builds_hint(monkeypatch):
         captured["length_hint"] = length_hint
 
     monkeypatch.setattr(admin, "_do_generate", fake_do)
-
-    msg = _admin_msg(monkeypatch, "300")
+    msg = _admin_msg(monkeypatch, "вред IQOS, 300 слов")
     state = _FakeState()
-    state._data["custom_topic"] = "Табак"
 
-    await admin.fb_custom_length(msg, MagicMock(), state)
+    await admin.fb_custom_topic(msg, bot=MagicMock(), state=state)
 
-    assert captured["topic"] == "Табак"
-    assert captured["length_hint"] is not None
+    assert captured["topic"] == "вред IQOS, 300 слов"
     assert "300" in captured["length_hint"]
     assert state._state is None  # state cleared
 
 
 @pytest.mark.asyncio
-async def test_custom_length_dash_default_hint(monkeypatch):
+async def test_custom_topic_no_length_uses_default(monkeypatch):
     captured = {}
 
     async def fake_do(message, bot, fmt="", topic=None, length_hint=None):
+        captured["topic"] = topic
         captured["length_hint"] = length_hint
 
     monkeypatch.setattr(admin, "_do_generate", fake_do)
+    msg = _admin_msg(monkeypatch, "Кальян и здоровье")
+    state = _FakeState()
 
+    await admin.fb_custom_topic(msg, bot=MagicMock(), state=state)
+
+    assert captured["topic"] == "Кальян и здоровье"
+    assert "150" in captured["length_hint"]  # дефолт
+
+
+@pytest.mark.asyncio
+async def test_custom_topic_dash_no_topic(monkeypatch):
+    captured = {}
+
+    async def fake_do(message, bot, fmt="", topic=None, length_hint=None):
+        captured["topic"] = topic
+
+    monkeypatch.setattr(admin, "_do_generate", fake_do)
     msg = _admin_msg(monkeypatch, "-")
     state = _FakeState()
-    state._data["custom_topic"] = "X"
 
-    await admin.fb_custom_length(msg, MagicMock(), state)
+    await admin.fb_custom_topic(msg, bot=MagicMock(), state=state)
 
-    assert captured["length_hint"] is None
+    assert captured["topic"] is None

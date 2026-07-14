@@ -76,3 +76,10 @@ EVENING_WORDS_DEFAULT = _int("EVENING_WORDS_DEFAULT", 350)  # слов 200-500
 HEARTBEAT_INTERVAL_HOURS = _int("HEARTBEAT_INTERVAL_HOURS", 6)
 HEARTBEAT_MAX_AGE_HOURS = _int("HEARTBEAT_MAX_AGE_HOURS", 8)
 
+# ===== U6: Telethon userbot (авто-Stories) =====
+TG_API_ID = _int("TG_API_ID", 0)
+TG_API_HASH = os.getenv("TG_API_HASH", "")
+TG_USERBOT_PHONE = os.getenv("TG_USERBOT_PHONE", "")
+TG_SESSION_PATH = os.getenv("TG_SESSION_PATH", "/opt/SMOKI/bot/userbot.session")
+STORY_FLOOD_CHANNEL = os.getenv("STORY_FLOOD_CHANNEL", "@smoktolk_flood")
+STORY_MAX_REGEN = _int("STORY_MAX_REGEN", 3)

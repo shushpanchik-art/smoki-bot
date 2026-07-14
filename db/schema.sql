@@ -54,3 +54,19 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT,
   updated_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS story_jobs (
+  id INTEGER PRIMARY KEY,
+  target TEXT NOT NULL,
+  theme INTEGER,
+  prompt_en TEXT,
+  image_path TEXT,
+  caption TEXT,
+  status TEXT DEFAULT 'pending',
+  feedback TEXT,
+  regen_count INTEGER DEFAULT 0,
+  message_id INTEGER,
+  story_msg_id INTEGER,
+  created_at TEXT DEFAULT (datetime('now')),
+  publish_at TEXT
+);

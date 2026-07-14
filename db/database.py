@@ -279,3 +279,78 @@ async def get_stats() -> dict:
         "tokens_total": tokens_total,
         "last_published": last_published,
     }
+
+
+# ===== U6: story_jobs (авто-Stories, userbot) =====
+
+async def add_story_job(target: str, theme: int | None = None,
+                        prompt_en: str | None = None,
+                        image_path: str | None = None,
+                        caption: str | None = None,
+                        publish_at: str | None = None) -> int:
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        cur = await db.execute(
+            "INSERT INTO story_jobs (target, theme, prompt_en, image_path, "
+            "caption, publish_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (target, theme, prompt_en, image_path, caption, publish_at),
+        )
+        await db.commit()
+        return int(cur.lastrowid or 0)
+
+
+async def get_story_job(job_id: int) -> dict | None:
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM story_jobs WHERE id = ?", (job_id,))
+        row = await cur.fetchone()
+        return dict(row) if row else None
+
+
+async def update_story_job(job_id: int, **fields):
+    if not fields:
+        return
+    cols = ", ".join(f"{k} = ?" for k in fields)
+    vals = list(fields.values()) + [job_id]
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        await db.execute(
+            f"UPDATE story_jobs SET {cols} WHERE id = ?", vals)
+        await db.commit()
+
+
+async def get_due_approved_story_jobs(now_iso: str) -> list[dict]:
+    """approved-задачи, у которых publish_at <= now (для userbot)."""
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM story_jobs WHERE status = 'approved' "
+            "AND (publish_at IS NULL OR publish_at <= ?) ORDER BY id ASC",
+            (now_iso,),
+        )
+        rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def get_pending_story_jobs() -> list[dict]:
+    """pending-задачи, ожидающие approve-flow в боте."""
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM story_jobs WHERE status = 'pending' "
+            "ORDER BY id ASC"
+        )
+        rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def get_published_story_images(limit: int = 200) -> list[dict]:
+    """Готовые картинки для реюза во flood (status=published, есть image_path)."""
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM story_jobs WHERE status = 'published' "
+            "AND image_path IS NOT NULL ORDER BY id DESC LIMIT ?",
+            (limit,),
+        )
+        rows = await cur.fetchall()
+        return [dict(r) for r in rows]

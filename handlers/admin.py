@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import random
+import re
 
 from aiogram import Router, F, Bot
 from aiogram.filters import Command
@@ -29,7 +30,6 @@ class ModerationStates(StatesGroup):
     waiting_liked_edit = State()
     waiting_censor_edit = State()
     waiting_custom_topic = State()
-    waiting_custom_length = State()
 
 
 def _is_admin_id(uid: int) -> bool:
@@ -113,7 +113,7 @@ def _admin_kb() -> InlineKeyboardMarkup:
     """Inline-меню админ-панели."""
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="\U0001F4DD Обычный пост", callback_data="adm_gen"),
+            InlineKeyboardButton(text="\U0001F4DD Статья по заказу", callback_data="adm_gen"),
         ],
         [
             InlineKeyboardButton(text="\u2600\ufe0f Утренний", callback_data="adm_gen_m"),
@@ -194,38 +194,26 @@ async def cb_adm_gen(cq: CallbackQuery, state: FSMContext):
     await cq.answer()
     await state.set_state(ModerationStates.waiting_custom_topic)
     await msg.answer(
-        "\U0001F4DD Напиши тему поста. Или отправь <code>-</code> — "
-        "выберу случайную сам."
+        "\U0001F4DD Пришлите тему/задание для статьи. Можно указать "
+        "желаемую длину (напр.: \u201eвред IQOS, 200 слов\u201c). "
+        "Если длину не укажете \u2014 до 150 слов."
     )
 
 
 @router.message(ModerationStates.waiting_custom_topic)
-async def fb_custom_topic(message: Message, state: FSMContext):
+async def fb_custom_topic(message: Message, bot: Bot, state: FSMContext):
     if not _is_admin(message):
         return
-    raw = (message.text or "").strip()
-    topic = None if raw in ("", "-") else raw
-    await state.update_data(custom_topic=topic)
-    await state.set_state(ModerationStates.waiting_custom_length)
-    await message.answer(
-        "\U0001F4CF Сколько слов? Отправь число (200-500) "
-        "или <code>-</code> — стандартная длина."
-    )
-
-
-@router.message(ModerationStates.waiting_custom_length)
-async def fb_custom_length(message: Message, bot: Bot, state: FSMContext):
-    if not _is_admin(message):
-        return
-    data = await state.get_data()
-    topic = data.get("custom_topic")
     await state.clear()
     raw = (message.text or "").strip()
-    length_hint = None
-    if raw not in ("", "-"):
-        digits = "".join(c for c in raw if c.isdigit())
-        if digits:
-            length_hint = prompts.words_rule(int(digits))
+    if raw in ("", "-"):
+        topic = None
+        max_words: int | None = None
+    else:
+        topic = raw
+        m = re.search(r"(\d+)\s*слов", raw, re.IGNORECASE)
+        max_words = int(m.group(1)) if m else None
+    length_hint = prompts.custom_words_rule(max_words, default=150)
     await _do_generate(message, bot, "", topic=topic, length_hint=length_hint)
 
 
@@ -539,13 +527,24 @@ async def _do_generate(message: Message, bot: Bot, fmt: str = "",
 
 
 @router.message(Command("generate"))
-async def cmd_generate(message: Message, bot: Bot):
+async def cmd_generate(message: Message, bot: Bot, state: FSMContext):
     """/generate или /generate morning|evening (аргумент опционален)."""
     if not _is_admin(message):
         return
     parts = (message.text or "").split()
     fmt = parts[1].lower() if len(parts) > 1 else ""
-    await _do_generate(message, bot, fmt)
+    if fmt in ("morning", "evening"):
+        await _do_generate(message, bot, fmt)
+        return
+    if await state.get_state() is not None:
+        await message.answer("Заверши текущее действие")
+        return
+    await state.set_state(ModerationStates.waiting_custom_topic)
+    await message.answer(
+        "\U0001F4DD Пришлите тему/задание для статьи. Можно указать "
+        "желаемую длину (напр.: \u201eвред IQOS, 200 слов\u201c). "
+        "Если длину не укажете \u2014 до 150 слов."
+    )
 
 
 @router.message(Command("generate_morning"))

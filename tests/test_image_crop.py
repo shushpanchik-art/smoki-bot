@@ -1,4 +1,4 @@
-"""Тесты центрального кропа картинки под 3:2."""
+"""Тесты центрального кропа картинки под 4:5 (портрет)."""
 import io
 
 from PIL import Image
@@ -16,20 +16,23 @@ def _size(data: bytes) -> tuple[int, int]:
     return Image.open(io.BytesIO(data)).size
 
 
-def test_square_becomes_landscape():
+def test_square_becomes_portrait():
     out = _crop_landscape(_png(1024, 1024))
     w, h = _size(out)
-    assert w == 1024
-    assert h == 683  # round(1024 / 1.5)
-    assert abs(w / h - 1.5) < 0.01
+    # ratio=4/5=0.8: target_h=1024/0.8=1280>1024 -> режем ширину
+    assert w == 819  # round(1024 * 0.8)
+    assert h == 1024
+    assert h > w  # портрет
+    assert abs(w / h - 0.8) < 0.01
 
 
-def test_already_landscape_wide_keeps_width():
-    # очень широкая (4:1) -> обрезаем по ширине до 3:2
+def test_wide_becomes_portrait():
+    # очень широкая (4:1) -> режем по ширине до 4:5
     out = _crop_landscape(_png(2000, 500))
     w, h = _size(out)
     assert h == 500
-    assert w == 750  # round(500 * 1.5)
+    assert w == 400  # round(500 * 0.8)
+    assert abs(w / h - 0.8) < 0.01
 
 
 def test_broken_bytes_returns_original():

@@ -236,3 +236,39 @@ def words_rule(words: int) -> str:
         "мягкий вывод.\n"
         "- Тон: неспешный, атмосферный, познавательный, без суеты."
     )
+
+
+def image_scene_prompt(body: str) -> str:
+    """LLM извлекает из статьи короткое EN-описание визуальной сцены."""
+    snippet = body[:1500]
+    return (
+        "You are an art director. Read the article below and describe, "
+        "in ONE English sentence (max 25 words), a concrete photographic "
+        "scene that visually represents its MAIN topic. "
+        "Include subject, setting, mood and a colour palette. "
+        "Do NOT mention text, letters or captions. Output only the sentence.\n\n"
+        f"ARTICLE:\n{snippet}"
+    )
+
+
+def image_prompt_from_scene(scene: str, topic: str) -> str:
+    """Технический каркас image_prompt, но сцена из текста статьи."""
+    scene = " ".join(scene.split())[:300]
+    return (
+        "CRITICAL: absolutely NO TEXT anywhere in the image. "
+        "No letters, no words, no captions, no titles, no headlines, "
+        "no signage, no typography, no writing. Book spines and labels "
+        "must be blank or blurred with no readable characters. "
+        "This is a purely visual wordless photographic illustration. "
+        "Wide horizontal landscape orientation, 3:2 aspect ratio "
+        "(clearly wider than tall). "
+        "The scene must FILL THE ENTIRE FRAME edge to edge - "
+        "absolutely NO white bars, NO black bars, NO borders, NO empty margins, "
+        "NO letterboxing, NO padding; the subject and background "
+        "extend fully to all four edges. "
+        f"High-quality editorial illustration for an article about: {topic}. "
+        "Theme: smoking culture (vapes, hookah, tobacco). "
+        f"Scene: {scene} "
+        "Stylish, cinematic, magazine cover quality. "
+        "No logos, no watermarks, no people's faces in focus."
+    )

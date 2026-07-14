@@ -163,7 +163,14 @@ async def generate_article(topic: str | None = None,
     body = result
 
     image_path = None
-    img_prompt = prompts.image_prompt(topic)
+    img_prompt = prompts.image_prompt(topic)  # фолбэк
+    try:
+        scene = (await _text(prompts.image_scene_prompt(body),
+                              temperature=0.7)).strip()
+        if scene:
+            img_prompt = prompts.image_prompt_from_scene(scene, topic)
+    except Exception:
+        logger.exception("Не удалось извлечь сцену из текста, фолбэк на topic")
     if make_image:
         try:
             data = await _image(img_prompt)

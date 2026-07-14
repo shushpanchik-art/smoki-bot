@@ -15,7 +15,7 @@ def test_prompt_from_scene_keeps_constraints():
     topic = "кальян"
     p = prompts.image_prompt_from_scene(scene, topic)
     assert "NO TEXT" in p
-    assert "3:2" in p
+    assert "FILL THE ENTIRE FRAME" in p
     assert topic in p
     assert scene[:30] in p
 

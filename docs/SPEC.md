@@ -341,6 +341,7 @@ P3 — nice-to-have. Разведка перед реализацией обяз
 ### U6.2 Канал @SMOKTOLK (генерация новых сторис)
 
 - [x] Промпты и конфиг РЕАЛИЗОВАНЫ (feature/u6.2a-story-config-prompts): `ai/prompts.STORY_THEMES`, `story_text_prompt`, `story_flood_caption_prompt`, `story_image_prompt` (9:16, 1080x1920, текст на русском разрешён); веса/лимиты/таймаут в `config.py` (`STORY_WEIGHT_*`, `STORY_CHANNEL_MIN/MAX_PER_DAY`, `STORY_FLOOD_MIN/MAX_PER_DAY`, `STORY_APPROVE_TIMEOUT_MIN`). Тест `tests/test_story_prompts.py`. TODO (U6.2b): задачник-планировщик слотов, генерация картинок, запись в `story_jobs`.
+- [x] Планировщик слотов РЕАЛИЗОВАН (feature/u6.2b-story-generator): `services/stories.py` (`pick_theme` по весам, `plan_daily_channel/flood`, `generate_channel_slot`/`generate_flood_slot` → `story_jobs` status='pending'); джобы `plan_stories_channel/flood` в scheduler (CronTrigger `STORY_PLAN_HOUR`). Тест `tests/test_stories.py`. TODO (U6.3): публикация approved-слотов; (U6.4): inline-модерация.
 
 - 3-7 сторис в день (случайно), слоты пишутся в задачник ежедневно.
 - Выбор темы по весам: шутка 15% / новость 25% / новинки 25% /

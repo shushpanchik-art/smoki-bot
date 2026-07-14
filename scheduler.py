@@ -11,7 +11,7 @@ from aiogram import Bot
 import config
 from db import database
 from ai import prompts
-from services import comments, content, publisher
+from services import comments, content, publisher, stories
 
 logger = logging.getLogger("smoki.scheduler")
 
@@ -187,6 +187,22 @@ def _random_minute() -> int:
     return random.randint(0, 59)
 
 
+async def _job_plan_stories_channel():
+    logger.info("Планировщик: раскладка дневных story-слотов канала")
+    try:
+        await stories.plan_daily_channel()
+    except Exception:
+        logger.exception("Ошибка планирования story-слотов канала")
+
+
+async def _job_plan_stories_flood():
+    logger.info("Планировщик: раскладка дневных story-слотов flood")
+    try:
+        await stories.plan_daily_flood()
+    except Exception:
+        logger.exception("Ошибка планирования story-слотов flood")
+
+
 def start(bot) -> AsyncIOScheduler:
     """Запуск планировщика. Вызывать после создания bot в main()."""
     global _scheduler, _bot
@@ -317,6 +333,25 @@ def start(bot) -> AsyncIOScheduler:
     )
     logger.info("Джоб heartbeat: каждые %d ч",
                 config.HEARTBEAT_INTERVAL_HOURS)
+
+    sched.add_job(
+        _job_plan_stories_channel,
+        CronTrigger(hour=config.STORY_PLAN_HOUR, minute=0),
+        id="plan_stories_channel",
+        replace_existing=True,
+        misfire_grace_time=3600,
+        coalesce=True,
+    )
+    sched.add_job(
+        _job_plan_stories_flood,
+        CronTrigger(hour=config.STORY_PLAN_HOUR, minute=15),
+        id="plan_stories_flood",
+        replace_existing=True,
+        misfire_grace_time=3600,
+        coalesce=True,
+    )
+    logger.info("Джобы story-слотов: %02d:00 / %02d:15",
+                config.STORY_PLAN_HOUR, config.STORY_PLAN_HOUR)
 
     sched.start()
     _scheduler = sched

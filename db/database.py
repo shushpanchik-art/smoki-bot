@@ -216,6 +216,19 @@ async def append_setting(key: str, text: str, sep: str = "\n- ", limit: int = 40
     await set_setting(key, combined)
 
 
+async def get_recent_comments(limit: int = 10) -> list[dict]:
+    """Последние N комментов (любого статуса) для админ-панели."""
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT id, username, text, status, classification, bot_reply "
+            "FROM comments ORDER BY id DESC LIMIT ?",
+            (limit,),
+        )
+        rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
+
 # ---------- статистика для админ-панели ----------
 async def get_stats() -> dict:
     """Сводка для админ-панели: счётчики статей/тем/комментов/ИИ-вызовов."""

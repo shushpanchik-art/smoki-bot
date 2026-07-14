@@ -318,3 +318,61 @@ P3 — nice-to-have. Разведка перед реализацией обяз
 
 - [x] S1 (P3) gitleaks в pre-commit локально (не только CI/публикация) — после
   перевода репо в public цена случайного коммита секрета выросла.
+
+## U6 — Авто-Stories @SMOKTOLK + @smoktolk_flood (userbot / Telethon, MTProto)
+
+Отдельный процесс `smoki-userbot.service` (Telethon), НЕ внутри aiogram-бота.
+Связь bot <-> userbot через общую БД (таблица `story_jobs`).
+
+Риск: использование MTProto для автоматизации нарушает ToS Telegram,
+возможна блокировка аккаунта. Риск принят владельцем проекта.
+
+### U6.1 БД
+
+Таблица `story_jobs`:
+
+- `id`, `target` (`channel` / `flood`)
+- `theme` (номер темы 1..5), `prompt_en` (промпт NanoBanana на английском)
+- `image_path`, `caption`
+- `status` (`pending` / `approved` / `published` / `rejected` / `cancelled`)
+- `feedback` (замечания админа при отклонении)
+- `created_at`, `publish_at`, `story_msg_id`
+
+### U6.2 Канал @SMOKTOLK (генерация новых сторис)
+
+- 3-7 сторис в день (случайно), слоты пишутся в задачник ежедневно.
+- Выбор темы по весам: шутка 15% / новость 25% / новинки 25% /
+  факт 30% / пожелание 5%.
+- Темы 1-4: сначала `generate_text(use_search=True)` — поиск факта/новости.
+- Далее генерируется NanoBanana-промпт на английском + системный блок:
+  размер 1080x1920 (9:16, формат сторис), текст на картинке на русском,
+  строгая проверка читаемости, без артефактов.
+
+### U6.3 Группа @smoktolk_flood (-1003918721575) — реюз картинок
+
+- 5-12 сторис в день (случайно), слоты в задачник ежедневно.
+- Реюз готовых картинок из `story_jobs` со статусом `published`.
+- `caption` = интересный факт по теме, 20-50 слов
+  (`generate_text(use_search=True)`), лимит длины проверяется (enforce).
+
+### U6.4 Approve-flow (в aiogram-боте, ЛС админу)
+
+- Показ картинки + подписи, inline-кнопки `[Опубликовать] [Отклонить] [Отмена]`.
+- Тишина 1 час -> автопубликация (`publish`).
+- Отклонить -> бот спрашивает "что не так" -> регенерация с учётом `feedback`.
+- Отмена -> слот пропущен (`status=cancelled`).
+
+### U6.5 Публикация (userbot)
+
+- userbot читает `approved` записи `story_jobs` c `publish_at <= now`.
+- `SendStoryRequest(peer, InputMediaUploadedPhoto, period=86400)`.
+- Канал должен быть бустнут до уровня доступности Stories
+  (без буста метод вернёт ошибку прав — прод-запуск только после буста).
+
+### U6.6 Конфиг и зависимости
+
+- `.env`: `TG_API_ID`, `TG_API_HASH`, `TG_USERBOT_PHONE`.
+- `.env.example`: те же ключи с плейсхолдерами
+  (иначе `test_env_example` в CI упадёт, если config их читает).
+- Файл сессии `*.session` -> в `.gitignore`; путь сессии -> в `bandit -x`.
+- requirements: `telethon`.

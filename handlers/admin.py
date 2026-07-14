@@ -132,6 +132,9 @@ def _admin_kb() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="\U0001F6AB Правила цензуры", callback_data="adm_censor"),
         ],
         [
+            InlineKeyboardButton(text="\U0001F4AC Комментарии", callback_data="adm_comments"),
+        ],
+        [
             InlineKeyboardButton(text="\U0001F4BE Сделать бэкап", callback_data="adm_backup"),
         ],
     ])
@@ -267,6 +270,38 @@ async def cb_adm_stats(cq: CallbackQuery):
         f"\U0001F553 Последняя публикация: <b>{last}</b>"
     )
     await msg.answer(text, parse_mode="HTML")
+
+
+@router.callback_query(F.data == "adm_comments")
+async def cb_adm_comments(cq: CallbackQuery):
+    msg = await _cb_msg(cq)
+    if not await _cb_guard(cq) or msg is None:
+        return
+    await cq.answer()
+    rows = await db.get_recent_comments(10)
+    if not rows:
+        await msg.answer("\U0001F4AC Комментариев пока нет.")
+        return
+    lines = ["\U0001F4AC <b>Последние комментарии</b>\n"]
+    for r in rows:
+        user = r.get("username") or "\u2014"
+        status = r.get("status") or "\u2014"
+        cls = r.get("classification") or "\u2014"
+        txt = (r.get("text") or "").replace("<", "&lt;").replace(">", "&gt;")
+        if len(txt) > 120:
+            txt = txt[:120] + "\u2026"
+        reply = r.get("bot_reply")
+        block = (
+            f"#{r['id']} @{user} [{status}/{cls}]\n"
+            f"\u2192 {txt}"
+        )
+        if reply:
+            rp = reply.replace("<", "&lt;").replace(">", "&gt;")
+            if len(rp) > 120:
+                rp = rp[:120] + "\u2026"
+            block += f"\n\U0001F916 {rp}"
+        lines.append(block)
+    await msg.answer("\n\n".join(lines), parse_mode="HTML")
 
 
 @router.callback_query(F.data == "adm_len")

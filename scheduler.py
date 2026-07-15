@@ -203,6 +203,24 @@ async def _job_plan_stories_flood():
         logger.exception("Ошибка планирования story-слотов flood")
 
 
+async def _job_send_pending_stories():
+    """Отправить админу на модерацию pending-сторис с наступившим publish_at."""
+    from handlers import admin
+    assert _bot is not None
+    now_iso = datetime.now().replace(microsecond=0).isoformat()
+    try:
+        jobs = await database.get_due_pending_story_jobs(now_iso)
+    except Exception:
+        logger.exception("Ошибка выборки due pending story-слотов")
+        return
+    for j in jobs:
+        try:
+            await admin.send_story_for_moderation(_bot, int(j["id"]))
+        except Exception:
+            logger.exception("Ошибка отправки story #%s на модерацию",
+                             j.get("id"))
+
+
 def start(bot) -> AsyncIOScheduler:
     """Запуск планировщика. Вызывать после создания bot в main()."""
     global _scheduler, _bot
@@ -352,6 +370,16 @@ def start(bot) -> AsyncIOScheduler:
     )
     logger.info("Джобы story-слотов: %02d:00 / %02d:15",
                 config.STORY_PLAN_HOUR, config.STORY_PLAN_HOUR)
+
+    sched.add_job(
+        _job_send_pending_stories,
+        IntervalTrigger(minutes=10),
+        id="send_pending_stories",
+        replace_existing=True,
+        misfire_grace_time=600,
+        coalesce=True,
+    )
+    logger.info("Джоб отправки story-слотов на модерацию: каждые 10 мин")
 
     sched.start()
     _scheduler = sched

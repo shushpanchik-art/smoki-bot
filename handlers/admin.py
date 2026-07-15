@@ -219,6 +219,8 @@ async def _build_schedule_ui() -> tuple[str, InlineKeyboardMarkup]:
             callback_data=f"sched:toggle:{job_id}",
         )])
     rows.append([InlineKeyboardButton(
+        text="🕑 Изменить время", callback_data="sched:times")])
+    rows.append([InlineKeyboardButton(
         text="⬅️ Назад", callback_data="adm_back")])
     hint = ("\n\n<i>▶️ Вкл = работает • "
             "⏸ Выкл = на паузе. Нажми, чтобы переключить.</i>")
@@ -1041,3 +1043,73 @@ async def fb_story_reject(message: Message, state: FSMContext):
         f"будет учтено при регенерации."
     )
 
+
+async def _build_times_ui() -> tuple[str, InlineKeyboardMarkup]:
+    """Экран изменения часа утренней/вечерней публикации (U8.2b)."""
+    from services import schedule_control as sc
+    rows: list[list[InlineKeyboardButton]] = []
+    lines = ["<b>🕑 Время публикаций</b>", ""]
+    for job_id, (_key, _attr) in sc.TIME_EDITABLE.items():
+        h = await sc.effective_hour(job_id)
+        label = sc.PAUSABLE_JOBS.get(job_id, job_id)
+        lines.append(f"{label}: <b>{h:02d}:00</b>")
+        rows.append([
+            InlineKeyboardButton(
+                text="➖ час", callback_data=f"sched:time:{job_id}:-1"),
+            InlineKeyboardButton(
+                text=f"{h:02d}:00", callback_data="noop"),
+            InlineKeyboardButton(
+                text="➕ час", callback_data=f"sched:time:{job_id}:1"),
+        ])
+    rows.append([InlineKeyboardButton(
+        text="⬅️ Назад", callback_data="adm_schedule")])
+    lines.append("")
+    lines.append("<i>Минута выбирается случайно при каждом изменении.</i>")
+    return "\n".join(lines), InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+@router.callback_query(F.data == "sched:times")
+async def cb_sched_times(cq: CallbackQuery):
+    """U8.2b — открыть экран изменения времени."""
+    msg = await _cb_msg(cq)
+    if not await _cb_guard(cq) or msg is None:
+        return
+    await cq.answer()
+    text, kb = await _build_times_ui()
+    try:
+        await msg.edit_text(text, parse_mode="HTML", reply_markup=kb)
+    except Exception:
+        await msg.answer(text, parse_mode="HTML", reply_markup=kb)
+
+
+@router.callback_query(F.data.startswith("sched:time:"))
+async def cb_sched_time_adjust(cq: CallbackQuery):
+    """U8.2b — сдвинуть час на +/-1 и перерисовать экран."""
+    msg = await _cb_msg(cq)
+    if not await _cb_guard(cq) or msg is None:
+        return
+    from services import schedule_control as sc
+    parts = (cq.data or "").split(":")
+    # sched:time:<job_id>:<delta>
+    if len(parts) != 4:
+        await cq.answer()
+        return
+    job_id, delta_raw = parts[2], parts[3]
+    try:
+        delta = int(delta_raw)
+    except ValueError:
+        await cq.answer()
+        return
+    cur = await sc.effective_hour(job_id)
+    new_h = await sc.set_hour(job_id, cur + delta)
+    await cq.answer(f"{sc.PAUSABLE_JOBS.get(job_id, job_id)}: {new_h:02d}:00")
+    text, kb = await _build_times_ui()
+    try:
+        await msg.edit_text(text, parse_mode="HTML", reply_markup=kb)
+    except Exception:
+        await msg.answer(text, parse_mode="HTML", reply_markup=kb)
+
+
+@router.callback_query(F.data == "noop")
+async def cb_noop(cq: CallbackQuery):
+    await cq.answer()

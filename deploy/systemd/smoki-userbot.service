@@ -1,0 +1,18 @@
+[Unit]
+Description=SMOKI userbot (Telethon) — авто-Stories publisher
+Documentation=file:/opt/SMOKI/bot/userbot.py
+After=network-online.target smoki-bot.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/SMOKI/bot
+ExecStart=/opt/SMOKI/bot/venv/bin/python /opt/SMOKI/bot/userbot.py
+Restart=always
+RestartSec=15
+# Первый запуск (авторизация по SMS) выполнить вручную в TTY:
+#   /opt/SMOKI/bot/venv/bin/python /opt/SMOKI/bot/userbot.py
+# затем: systemctl enable --now smoki-userbot
+
+[Install]
+WantedBy=multi-user.target

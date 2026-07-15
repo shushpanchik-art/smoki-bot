@@ -379,8 +379,8 @@ P3 — nice-to-have. Разведка перед реализацией обяз
 - `.env`: `TG_API_ID`, `TG_API_HASH`, `TG_USERBOT_PHONE`.
 - `.env.example`: те же ключи с плейсхолдерами
   (иначе `test_env_example` в CI упадёт, если config их читает).
-- Файл сессии `*.session` -> в `.gitignore`; путь сессии -> в `bandit -x`.
-- requirements: `telethon`.
+- Файл сессии `*.session` -> в `.gitignore`; путь сессии -> в `bandit -x`. (DONE: `.gitignore`)
+- requirements: `telethon`. (DONE: `telethon==1.44.0`)
 - `.env`/`.env.example` дополнены (U6.2a): `STORY_WEIGHT_JOKE`, `STORY_WEIGHT_NEWS`, `STORY_WEIGHT_NEW_PRODUCTS`, `STORY_WEIGHT_FACT`, `STORY_WEIGHT_WISH`, `STORY_CHANNEL_MIN_PER_DAY`, `STORY_CHANNEL_MAX_PER_DAY`, `STORY_FLOOD_MIN_PER_DAY`, `STORY_FLOOD_MAX_PER_DAY`, `STORY_APPROVE_TIMEOUT_MIN` (значения = дефолты config).
 
 ### U7 — Формат картинки поста (РЕШЕНО: 4:5)

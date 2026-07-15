@@ -349,6 +349,7 @@ async def get_due_pending_story_jobs(now_iso: str) -> list[dict]:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             "SELECT * FROM story_jobs WHERE status = 'pending' "
+            "AND message_id IS NULL "
             "AND (publish_at IS NULL OR publish_at <= ?) ORDER BY id ASC",
             (now_iso,),
         )

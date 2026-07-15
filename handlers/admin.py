@@ -136,6 +136,9 @@ def _admin_kb() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="\U0001F4AC Комментарии", callback_data="adm_comments"),
         ],
         [
+            InlineKeyboardButton(text="📸 Сторис (сейчас)", callback_data="adm_story"),
+        ],
+        [
             InlineKeyboardButton(text="\U0001F4BE Сделать бэкап", callback_data="adm_backup"),
         ],
     ])
@@ -560,6 +563,28 @@ async def cmd_generate_evening(message: Message, bot: Bot):
     if not _is_admin(message):
         return
     await _do_generate(message, bot, "evening")
+
+
+@router.callback_query(F.data == "adm_story")
+async def cb_adm_story(cq: CallbackQuery):
+    """Кнопка «📸 Сторис» — то же, что /story."""
+    msg = await _cb_msg(cq)
+    if not await _cb_guard(cq) or msg is None:
+        return
+    await cq.answer()
+    await msg.answer(
+        "🖼️ Генерирую сторис-слот, подожди ~30-60 сек…"
+    )
+    try:
+        job_id = await stories.generate_channel_slot()
+    except Exception:
+        logger.exception("cb_adm_story: ошибка генерации слота")
+        await msg.answer("⚠️ Ошибка генерации сторис (см. логи).")
+        return
+    if not job_id:
+        await msg.answer("⚠️ Слот не создан (пустой ответ ИИ?).")
+        return
+    await send_story_for_moderation(_bot(cq), int(job_id))
 
 
 @router.message(Command("story"))

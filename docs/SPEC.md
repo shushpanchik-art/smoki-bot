@@ -381,6 +381,7 @@ P3 — nice-to-have. Разведка перед реализацией обяз
 - [ ] U6.5b РУЧНОЙ ПРОД-ШАГ (ждёт API от владельца): реальные `TG_API_ID`/`TG_API_HASH`/`TG_USERBOT_PHONE` в `.env`; интерактивная авторизация сессии (SMS-код, первый запуск в TTY); буст канала @SMOKTOLK до уровня Stories; `pip install telethon==1.44.0` в venv; `systemctl enable --now smoki-userbot`. БЕЗ буста SendStoryRequest вернёт ошибку прав — прод-запуск только после буста.
 
 ### U6.7 Наложение текста на картинку (Pillow)
+
 - [x] РЕАЛИЗОВАНО (feature/u6-7-story-render): `services/story_render.py` — `render_story_caption(image_bytes, caption)` кропает/масштабирует картинку под 1080x1920 (9:16, `Image.Resampling.LANCZOS`), рисует подпись внизу белым жирным шрифтом на полупрозрачной тёмной подложке (перенос по словам, русский текст). Константы: `_FONT_SIZE`, `_MAX_CHARS`, `_BOTTOM_MARGIN`, `_SIDE_MARGIN`. Используется в pipeline перед публикацией сторис. Тест `tests/test_story_render.py`.
 
 ### U6.6 Конфиг и зависимости

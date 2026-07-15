@@ -444,3 +444,40 @@ Scope (разведка обязательна перед реализацией
 APScheduler (контент/сторис). Панель должна показывать оба, но
 РЕДАКТИРОВАТЬ из бота можно только APScheduler-джобы; таймеры бэкапов —
 только просмотр (правка через deploy/systemd + rsync на сервер).
+
+## U8.2 — управление расписанием из админ-панели
+
+### Состояние (обновляется по мере работы)
+
+- **U8.1** ✅ — экран `adm_schedule`: показ джоб и `next_run_time`
+  (`services/schedule_view.build_schedule_text`).
+- **U8.2a** ✅ — пауза/возобновление контентных задач
+  (`services/schedule_control.py`). Персист в `settings["paused_jobs"]`
+  (CSV). Тумблеры `sched:toggle:<job_id>` в экране расписаний.
+  Восстановление при старте: `apply_persisted_pauses()` из `bot.main`
+  после `scheduler.start`. Белый список `PAUSABLE_JOBS` — сторожа
+  `heartbeat`/`delivery_watchdog` не паузятся. Коммит `c6c24f9`.
+- **U8.2b** 🔄 — изменение часа утренней/вечерней публикации.
+  `TIME_EDITABLE = {daily_morning: MORNING_START, daily_evening:
+  EVENING_START}`. Override в `settings["time_<job>"]` (час 0-23).
+  `effective_hour` = override → иначе config-дефолт. Экран `sched:times`,
+  кнопки `sched:time:<job>:<±1>` двигают час, `set_hour` пишет в settings
+  - `reschedule_job` (минута случайная). Применяется при старте внутри
+  `apply_persisted_pauses`. Тесты `tests/test_schedule_time.py`.
+
+### Дальнейшие шаги (если прервёмся)
+
+1. Прогнать всё: `venv/bin/python -m pytest -q`,
+   `venv/bin/ruff check`, `venv/bin/python -m mypy` по изменённым файлам.
+2. Коммит U8.2b в ту же ветку `feature/u8-2a-job-pause`.
+3. `git push`, `gh pr create`, дождаться зелёного CI, merge через UI.
+4. `git checkout main && git pull && git branch -d <ветка>`,
+   `git remote prune origin`.
+5. Проверить на сервере после merge+deploy:
+   `systemctl restart smoki-bot`, панель → Расписание → тумблеры и
+   «Изменить время» работают, переживают рестарт.
+
+### Возможные будущие пункты U8
+
+- U8.3 — редактирование интервалов (`COMMENTS_INTERVAL_HOURS` и т.п.).
+- U8.4 — ручной «запустить сейчас» для контентной джобы (run_job).

@@ -247,7 +247,7 @@ def start(bot) -> AsyncIOScheduler:
     m_min = _random_minute()
     sched.add_job(
         _job_morning,
-        CronTrigger(hour=config.MORNING_START, minute=m_min),
+        CronTrigger(hour=config.MORNING_START, minute=m_min),  # override после старта
         id="daily_morning", replace_existing=True,
     )
     logger.info("Джоб утро: %02d:%02d", config.MORNING_START, m_min)
@@ -256,7 +256,7 @@ def start(bot) -> AsyncIOScheduler:
     e_min = _random_minute()
     sched.add_job(
         _job_evening,
-        CronTrigger(hour=config.EVENING_START, minute=e_min),
+        CronTrigger(hour=config.EVENING_START, minute=e_min),  # override после старта
         id="daily_evening", replace_existing=True,
     )
     logger.info("Джоб вечер: %02d:%02d", config.EVENING_START, e_min)

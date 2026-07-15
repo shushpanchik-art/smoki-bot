@@ -15,6 +15,7 @@ from pathlib import Path
 import config
 from ai import gemini, prompts
 from db import database as db
+from services import story_render
 
 logger = logging.getLogger("smoki.stories")
 
@@ -105,12 +106,15 @@ async def generate_channel_slot(theme: int | None = None,
         caption = snippet[:200]
 
     scene = f"atmospheric background for topic: {prompts.STORY_THEMES.get(theme, '')}"
-    img_prompt = prompts.story_image_prompt(scene, overlay_text=caption or "")
+    img_prompt = prompts.story_image_prompt(scene)  # текст накладываем Pillow
     IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     image_path: str | None = None
     try:
         data = await _image(img_prompt)
         if data:
+            data = await asyncio.to_thread(
+                story_render.render_story_caption, data, caption or "",
+            )
             fname = f"story_{int(time.time())}_{uuid.uuid4().hex[:8]}.png"
             fpath = IMAGE_DIR / fname
             fpath.write_bytes(data)

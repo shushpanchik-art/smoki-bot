@@ -205,7 +205,7 @@ async def cb_adm_schedule(cq: CallbackQuery):
 
 
 async def _build_schedule_ui() -> tuple[str, InlineKeyboardMarkup]:
-    """Собрать текст расписаний и клавиатуру тумблеров паузы."""
+    """Собрать текст расписаний и клавиатуру тумблеров паузы + время (U8.2c)."""
     from services import schedule_view, schedule_control
     text = await schedule_view.build_schedule_text()
     paused = await schedule_control.get_paused()
@@ -218,12 +218,21 @@ async def _build_schedule_ui() -> tuple[str, InlineKeyboardMarkup]:
             text=f"{state}  {label}",
             callback_data=f"sched:toggle:{job_id}",
         )])
-    rows.append([InlineKeyboardButton(
-        text="🕑 Изменить время", callback_data="sched:times")])
+        # Для редактируемых по времени джоб — ряд управления часом прямо под ними.
+        if job_id in schedule_control.TIME_EDITABLE:
+            h = await schedule_control.effective_hour(job_id)
+            rows.append([
+                InlineKeyboardButton(
+                    text="➖", callback_data=f"sched:time:{job_id}:-1"),
+                InlineKeyboardButton(
+                    text=f"🕑 {h:02d}:00", callback_data="noop"),
+                InlineKeyboardButton(
+                    text="➕", callback_data=f"sched:time:{job_id}:1"),
+            ])
     rows.append([InlineKeyboardButton(
         text="⬅️ Назад", callback_data="adm_back")])
-    hint = ("\n\n<i>▶️ Вкл = работает • "
-            "⏸ Выкл = на паузе. Нажми, чтобы переключить.</i>")
+    hint = ("\n\n<i>▶️ Вкл = работает • ⏸ Выкл = на паузе • "
+            "🕑 ➖/➕ меняет час публикации (минута случайная).</i>")
     return text + hint, InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -1044,44 +1053,6 @@ async def fb_story_reject(message: Message, state: FSMContext):
     )
 
 
-async def _build_times_ui() -> tuple[str, InlineKeyboardMarkup]:
-    """Экран изменения часа утренней/вечерней публикации (U8.2b)."""
-    from services import schedule_control as sc
-    rows: list[list[InlineKeyboardButton]] = []
-    lines = ["<b>🕑 Время публикаций</b>", ""]
-    for job_id, (_key, _attr) in sc.TIME_EDITABLE.items():
-        h = await sc.effective_hour(job_id)
-        label = sc.PAUSABLE_JOBS.get(job_id, job_id)
-        lines.append(f"{label}: <b>{h:02d}:00</b>")
-        rows.append([
-            InlineKeyboardButton(
-                text="➖ час", callback_data=f"sched:time:{job_id}:-1"),
-            InlineKeyboardButton(
-                text=f"{h:02d}:00", callback_data="noop"),
-            InlineKeyboardButton(
-                text="➕ час", callback_data=f"sched:time:{job_id}:1"),
-        ])
-    rows.append([InlineKeyboardButton(
-        text="⬅️ Назад", callback_data="adm_schedule")])
-    lines.append("")
-    lines.append("<i>Минута выбирается случайно при каждом изменении.</i>")
-    return "\n".join(lines), InlineKeyboardMarkup(inline_keyboard=rows)
-
-
-@router.callback_query(F.data == "sched:times")
-async def cb_sched_times(cq: CallbackQuery):
-    """U8.2b — открыть экран изменения времени."""
-    msg = await _cb_msg(cq)
-    if not await _cb_guard(cq) or msg is None:
-        return
-    await cq.answer()
-    text, kb = await _build_times_ui()
-    try:
-        await msg.edit_text(text, parse_mode="HTML", reply_markup=kb)
-    except Exception:
-        await msg.answer(text, parse_mode="HTML", reply_markup=kb)
-
-
 @router.callback_query(F.data.startswith("sched:time:"))
 async def cb_sched_time_adjust(cq: CallbackQuery):
     """U8.2b — сдвинуть час на +/-1 и перерисовать экран."""
@@ -1103,7 +1074,7 @@ async def cb_sched_time_adjust(cq: CallbackQuery):
     cur = await sc.effective_hour(job_id)
     new_h = await sc.set_hour(job_id, cur + delta)
     await cq.answer(f"{sc.PAUSABLE_JOBS.get(job_id, job_id)}: {new_h:02d}:00")
-    text, kb = await _build_times_ui()
+    text, kb = await _build_schedule_ui()
     try:
         await msg.edit_text(text, parse_mode="HTML", reply_markup=kb)
     except Exception:

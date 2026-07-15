@@ -192,20 +192,56 @@ async def _cb_guard(cq: CallbackQuery) -> bool:
 
 @router.callback_query(F.data == "adm_schedule")
 async def cb_adm_schedule(cq: CallbackQuery):
-    """U8.1 — показать расписания (APScheduler + systemd-таймеры). Просмотр."""
+    """U8.1/U8.2a — расписания + тумблеры паузы контентных задач."""
     msg = await _cb_msg(cq)
     if not await _cb_guard(cq) or msg is None:
         return
     await cq.answer()
-    from services import schedule_view
+    text, kb = await _build_schedule_ui()
+    try:
+        await msg.edit_text(text, parse_mode="HTML", reply_markup=kb)
+    except Exception:
+        await msg.answer(text, parse_mode="HTML", reply_markup=kb)
+
+
+async def _build_schedule_ui() -> tuple[str, InlineKeyboardMarkup]:
+    """Собрать текст расписаний и клавиатуру тумблеров паузы."""
+    from services import schedule_view, schedule_control
     text = await schedule_view.build_schedule_text()
-    if hasattr(msg, "edit_text"):
-        try:
-            await msg.edit_text(text, parse_mode="HTML", reply_markup=_back_kb())
-            return
-        except Exception:
-            pass
-    await msg.answer(text, parse_mode="HTML", reply_markup=_back_kb())
+    paused = await schedule_control.get_paused()
+    rows: list[list[InlineKeyboardButton]] = []
+    on_lbl = "▶️ Вкл"
+    off_lbl = "⏸ Выкл"
+    for job_id, label in schedule_control.PAUSABLE_JOBS.items():
+        state = off_lbl if job_id in paused else on_lbl
+        rows.append([InlineKeyboardButton(
+            text=f"{state}  {label}",
+            callback_data=f"sched:toggle:{job_id}",
+        )])
+    rows.append([InlineKeyboardButton(
+        text="⬅️ Назад", callback_data="adm_back")])
+    hint = ("\n\n<i>▶️ Вкл = работает • "
+            "⏸ Выкл = на паузе. Нажми, чтобы переключить.</i>")
+    return text + hint, InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+@router.callback_query(F.data.startswith("sched:toggle:"))
+async def cb_sched_toggle(cq: CallbackQuery):
+    """U8.2a — переключить паузу задачи и перерисовать экран."""
+    msg = await _cb_msg(cq)
+    if not await _cb_guard(cq) or msg is None:
+        return
+    from services import schedule_control
+    job_id = (cq.data or "").split(":", 2)[-1]
+    now_paused = await schedule_control.toggle_pause(job_id)
+    label = schedule_control.PAUSABLE_JOBS.get(job_id, job_id)
+    status = "на паузе ⏸" if now_paused else "работает ▶️"
+    await cq.answer(f"{label}: {status}")
+    text, kb = await _build_schedule_ui()
+    try:
+        await msg.edit_text(text, parse_mode="HTML", reply_markup=kb)
+    except Exception:
+        await msg.answer(text, parse_mode="HTML", reply_markup=kb)
 
 
 @router.callback_query(F.data == "adm_gen")

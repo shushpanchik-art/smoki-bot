@@ -68,6 +68,8 @@ async def main():
 
     await setup_bot_menu(bot)
     scheduler.start(bot)
+    from services import schedule_control
+    await schedule_control.apply_persisted_pauses()
     logger.info("Планировщик активирован")
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)

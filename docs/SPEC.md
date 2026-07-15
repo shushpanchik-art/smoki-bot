@@ -65,7 +65,7 @@ venv/bin/ruff check <файл> --fix
 
 Полный прогон как в CI (джоба Ruff lint):
 
-venv/bin/ruff check . --exclude venv,data,__pycache__
+venv/bin/ruff check . --exclude venv,data,**pycache**
 
 Это ловит ошибки (F541, неиспользуемые импорты и т.п.) до GitHub Actions и экономит запуски CI. Версии ruff/mypy в venv обязаны совпадать с CI: ruff==0.15.12, mypy==1.14.1.
 
@@ -91,7 +91,7 @@ Message|InaccessibleMessage. При /start отправляется ReplyKeyboar
 
 1. Python syntax check (компиляция)
 2. Ruff lint (ruff==0.15.12)
-3. Bandit security (bandit==1.9.4, -ll, -x venv,data,__pycache__)
+3. Bandit security (bandit==1.9.4, -ll, -x venv,data,**pycache**)
 4. pip-audit
 5. Pytest + coverage (--cov-fail-under=45)
 6. codespell
@@ -170,20 +170,18 @@ Message|InaccessibleMessage. При /start отправляется ReplyKeyboar
 
 ## Выученные уроки (операционные)
 
-- __Формат картинки 4:5 (best practice)__: на мобильных постах Telegram картинка 4:5 (портрет) смотрится лучше квадрата/горизонта — занимает больше экрана, выше вовлечённость. Подтверждено тестом владельца на телефоне. Реализация — `ai/gemini._crop_landscape(ratio=4/5)` (дефолт), кроп квадрата 1024x1024 на нашей стороне (SDK не умеет `aspect_ratio`). НЕ откатывать к 3:2/квадрату. См. §U7.
+- **Формат картинки 4:5 (best practice)**: на мобильных постах Telegram картинка 4:5 (портрет) смотрится лучше квадрата/горизонта — занимает больше экрана, выше вовлечённость. Подтверждено тестом владельца на телефоне. Реализация — `ai/gemini._crop_landscape(ratio=4/5)` (дефолт), кроп квадрата 1024x1024 на нашей стороне (SDK не умеет `aspect_ratio`). НЕ откатывать к 3:2/квадрату. См. §U7.
 
-- __Формат картинки 4:5 (best practice)__: на мобильных постах Telegram картинка 4:5 (портрет) смотрится лучше квадрата/горизонта — занимает больше экрана, выше вовлечённость. Подтверждено тестом владельца на телефоне. Реализация — `ai/gemini._crop_landscape(ratio=4/5)` (дефолт), кроп квадрата 1024x1024 на нашей стороне (SDK не умеет `aspect_ratio`). НЕ откатывать к 3:2/квадрату. См. §U7.
-
-- __Беспарольный рестарт__: настроен sudoers drop-in `/etc/sudoers.d/smoki-bot`
+- **Беспарольный рестарт**: настроен sudoers drop-in `/etc/sudoers.d/smoki-bot`
   (по образцу `smoktolk-bot`). Разрешены без пароля: `systemctl restart/start/stop/status smoki-bot`.
   Проверка синтаксиса перед активацией обязательна: `sudo visudo -c`.
   Тест: `sudo -n systemctl restart smoki-bot` (флаг `-n` = не спрашивать пароль).
-- __Чистка веток-зомби__: смёрженные локальные ветки удалять `git branch -d <name>`;
+- **Чистка веток-зомби**: смёрженные локальные ветки удалять `git branch -d <name>`;
   устаревшие remote-tracking refs — `git remote prune origin`.
   После merge PR через UI удалённая ветка на GitHub исчезает, локально остаётся зомби.
-- __Кэш байткода__: каталоги `__pycache__` покрыты `.gitignore`, git их не видит; периодически чистить
-  `find . -path ./venv -prune -o -name __pycache__ -type d -exec rm -rf {} +`.
-- __journalctl__: для свежих логов после рестарта надёжнее `--since` по времени,
+- **Кэш байткода**: каталоги `**pycache**` покрыты `.gitignore`, git их не видит; периодически чистить
+  `find . -path ./venv -prune -o -name **pycache** -type d -exec rm -rf {} +`.
+- **journalctl**: для свежих логов после рестарта надёжнее `--since` по времени,
   чем `-n50` (последнее может захватить хвост старого процесса).
 
 ## Эксплуатация: CI troubleshooting

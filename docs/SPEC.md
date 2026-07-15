@@ -8,7 +8,7 @@
 
 - Путь: /opt/SMOKI/bot, venv venv/bin/python
 - systemd: smoki-bot (Restart=always), режим polling
-- Python 3.11.2, aiogram 3.29.1, aiosqlite, apscheduler, dotenv
+- Python 3.11.2, aiogram 3.29.1, aiosqlite 0.22.1, apscheduler 3.11.3, SQLAlchemy 2.0.51 (persistent jobstore), python-dotenv 1.2.2, Pillow 12.3.0, telethon 1.44.0
 - БД smoki.db: published_topics, articles, comments, ai_logs, settings
 - Управление: systemctl restart smoki-bot; journalctl -u smoki-bot -n50
 
@@ -296,7 +296,7 @@ P3 — nice-to-have. Разведка перед реализацией обяз
   (handlers/admin.py cb_adm_comments) показывает последние 10 комментов
   с классом ИИ и ответом бота; при пустой таблице — «Комментариев пока нет».
   Прозрачность автомодерации без чтения журналов группы.
-- [x] U5 (P2) Image-prompt из ТЕКСТА статьи. РЕАЛИЗОВАНО (feature/u5-image-scene-from-text): в services/content.generate_article после цензуры шаг ИИ (_text(prompts.image_scene_prompt(body))) генерит EN-описание сцены по телу статьи, оно идёт в prompts.image_prompt_from_scene(scene, topic); фолбэк на prompts.image_prompt(topic) при пустом ответе/ошибке. Constraints (NO TEXT, 3:2) сохранены. Тест tests/test_image_scene.py. Историческое описание проблемы: Проблема (прод, скриншоты):
+- [x] U5 (P2) Image-prompt из ТЕКСТА статьи. РЕАЛИЗОВАНО (feature/u5-image-scene-from-text): в services/content.generate_article после цензуры шаг ИИ (_text(prompts.image_scene_prompt(body))) генерит EN-описание сцены по телу статьи, оно идёт в prompts.image_prompt_from_scene(scene, topic); фолбэк на prompts.image_prompt(topic) при пустом ответе/ошибке. Constraints (NO TEXT, 4:5) сохранены. Тест tests/test_image_scene.py. Историческое описание проблемы: Проблема (прод, скриншоты):
   картинки однотипны — `prompts.image_prompt(topic)` строит сцену
   детерминированно (hash темы -> _IMG_SCENES/_IMG_PALETTES), поэтому
   одинаковая/близкая тема -> одинаковая картинка, тем немного -> повтор.
@@ -304,7 +304,7 @@ P3 — nice-to-have. Разведка перед реализацией обяз
   ИИ генерит краткое EN-описание сцены по телу статьи `body`
   (новый prompts.image_scene_from_text(body) + gemini.generate_text,
   use_search=False); описание подставляется в image_prompt вместо
-  hash-сцены/topic. Жёсткие constraints (NO TEXT, 3:2, fill frame, no logos)
+  hash-сцены/topic. Жёсткие constraints (NO TEXT, 4:5, fill frame, no logos)
   сохранить. Фолбэк на текущий image_prompt(topic) при пустом ответе ИИ.
   Тест tests/test_image_scene.py. Отдельный PR (код).
 

@@ -136,7 +136,7 @@ async def _build_client() -> Any:
     client = TelegramClient(
         config.TG_SESSION_PATH, config.TG_API_ID, config.TG_API_HASH
     )
-    await client.start(phone=config.TG_USERBOT_PHONE)  # type: ignore[arg-type]
+    await client.start(phone=config.TG_USERBOT_PHONE)
     me = await client.get_me()
     logger.info("Userbot авторизован как %s", getattr(me, "username", me))
     return client
@@ -154,7 +154,7 @@ async def main() -> None:
                 logger.exception("Ошибка цикла публикации историй")
             await asyncio.sleep(POLL_INTERVAL_SEC)
     finally:
-        await client.disconnect()  # type: ignore[union-attr]
+        await client.disconnect()
 
 
 if __name__ == "__main__":

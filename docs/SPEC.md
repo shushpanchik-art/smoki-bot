@@ -376,6 +376,9 @@ P3 — nice-to-have. Разведка перед реализацией обяз
 - Канал должен быть бустнут до уровня доступности Stories
   (без буста метод вернёт ошибку прав — прод-запуск только после буста).
 
+- [x] Публикация userbot РЕАЛИЗОВАНА-КОД (feature/u6-5-userbot-publish): `userbot.py` — отдельный процесс, Telethon импортируется ЛЕНИВО внутри функций (модуль тестируется без установленного telethon). `process_due_stories(client)` читает `db.get_due_approved_story_jobs(now)`, `_publish_story` шлёт `SendStoryRequest(peer, InputMediaUploadedPhoto, period=86400)` (peer = CHANNEL_ID для channel / STORY_FLOOD_CHANNEL для flood), затем `update_story_job(status='published', story_msg_id=...)`; ошибка отдельного слота → `status='error'`, цикл не падает. `main()` — цикл с POLL_INTERVAL_SEC=300. Юнит `deploy/systemd/smoki-userbot.service` (Restart=always). Тест `tests/test_userbot.py` (мок публикации: approved-due→published, пропуск pending, ошибка→error, `_extract_story_id`).
+- [ ] U6.5b РУЧНОЙ ПРОД-ШАГ (ждёт API от владельца): реальные `TG_API_ID`/`TG_API_HASH`/`TG_USERBOT_PHONE` в `.env`; интерактивная авторизация сессии (SMS-код, первый запуск в TTY); буст канала @SMOKTOLK до уровня Stories; `pip install telethon==1.44.0` в venv; `systemctl enable --now smoki-userbot`. БЕЗ буста SendStoryRequest вернёт ошибку прав — прод-запуск только после буста.
+
 ### U6.6 Конфиг и зависимости
 
 - `.env`: `TG_API_ID`, `TG_API_HASH`, `TG_USERBOT_PHONE`.

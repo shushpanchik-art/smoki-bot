@@ -104,7 +104,8 @@ async def generate_channel_slot(theme: int | None = None,
     if not caption:
         caption = snippet[:200]
 
-    img_prompt = prompts.story_image_prompt(caption or "smoking culture story")
+    scene = f"atmospheric background for topic: {prompts.STORY_THEMES.get(theme, '')}"
+    img_prompt = prompts.story_image_prompt(scene, overlay_text=caption or "")
     IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     image_path: str | None = None
     try:

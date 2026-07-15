@@ -49,5 +49,21 @@ def test_story_image_prompt_vertical():
     p = prompts.story_image_prompt("neon vape shop at night")
     assert "9:16" in p
     assert "1080x1920" in p
-    assert "RUSSIAN" in p
     assert "neon vape shop at night" in p
+
+
+def test_story_image_prompt_overlay_text_rules():
+    phrase = "Отличного дня"
+    p = prompts.story_image_prompt("neon vape shop", overlay_text=phrase)
+    assert "9:16" in p
+    assert phrase in p                       # фраза дословно
+    assert "EXACTLY" in p
+    assert "RUSSIAN" in p
+    assert "NO gibberish" in p
+
+
+def test_story_image_prompt_no_text_when_empty():
+    p = prompts.story_image_prompt("neon vape shop")
+    assert "9:16" in p
+    assert "NO TEXT" in p
+    assert "neon vape shop" in p

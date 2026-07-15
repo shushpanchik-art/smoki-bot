@@ -329,22 +329,53 @@ def story_flood_caption_prompt(theme: int, search_snippet: str = "") -> str:
     return base
 
 
-def story_image_prompt(scene: str) -> str:
+def story_image_prompt(scene: str, overlay_text: str = "") -> str:
     """NanoBanana-промпт для вертикальной сторис 9:16 (1080x1920).
 
-    В отличие от постов, здесь ТЕКСТ на картинке РАЗРЕШЁН и на русском —
-    крупный, читаемый, без артефактов.
+    scene        — краткое описание визуальной СЦЕНЫ (фон, объекты, настроение).
+    overlay_text — необязательная короткая надпись на картинке.
+                   Пусто → на картинке НЕТ никакого текста.
+
+    Текст разрешён, но с жёсткими правилами написания: только дословная
+    русская фраза, крупный печатный шрифт, без выдумок и артефактов.
     """
     scene = " ".join(scene.split())[:400]
-    return (
-        "Vertical Stories format, portrait 9:16 aspect ratio, 1080x1920 pixels. "
-        "The image MUST fill the entire vertical frame edge to edge - "
-        "no black bars, no white bars, no borders, no letterboxing. "
-        f"Scene: {scene} "
-        "Theme: smoking culture (vapes, hookah, tobacco), stylish, cinematic, "
-        "modern social-media Stories aesthetic, vivid colours. "
-        "If any text is shown, it MUST be in correct RUSSIAN, large, "
-        "highly legible, clean sans-serif, perfectly spelled, no gibberish, "
-        "no distorted letters, no artefacts. "
-        "No logos, no watermarks, no faces in sharp focus."
-    )
+    overlay_text = " ".join(overlay_text.split())[:120]
+
+    parts = [
+        "Vertical Stories format, portrait 9:16 aspect ratio, 1080x1920 pixels. ",
+        "The image MUST fill the entire vertical frame edge to edge - ",
+        "no black bars, no white bars, no borders, no letterboxing. ",
+        f"Scene: {scene} ",
+        "Theme: smoking culture (vapes, hookah, tobacco), stylish, cinematic, ",
+        "modern social-media Stories aesthetic, vivid colours. ",
+    ]
+
+    if overlay_text:
+        parts += [
+            "TEXT OVERLAY RULES (follow strictly): ",
+            "render EXACTLY this Russian phrase and NOTHING else, word for word, "
+            "character for character, do not add, remove, translate, "
+            f"invent or alter any letters: «{overlay_text}». ",
+            "The text MUST be in correct, real, grammatically valid RUSSIAN "
+            "(Cyrillic script only), perfectly spelled. ",
+            "Use ONE short line (or two at most), large bold clean sans-serif, "
+            "high contrast against the background, centred, ",
+            "inside the safe zone (keep clear of the top and bottom edges). ",
+            "Absolutely NO gibberish, NO fake or mirrored letters, "
+            "NO distorted, warped or handwritten script, NO random background "
+            "text, NO neon signs with nonsense words, NO extra captions, "
+            "NO watermarks, NO logos, NO duplicated text. ",
+            "If you cannot render the phrase perfectly and legibly, "
+            "render the image WITHOUT any text instead. ",
+        ]
+    else:
+        parts += [
+            "CRITICAL: absolutely NO TEXT anywhere in the image. ",
+            "No letters, no words, no captions, no signs, no gibberish, "
+            "no watermarks, no logos. ",
+        ]
+
+    parts.append("No faces in sharp focus.")
+    return "".join(parts)
+

@@ -14,7 +14,7 @@ from aiogram.types import (
 
 import config
 from db import database as db
-from services import content, publisher
+from services import content, publisher, stories
 from ai import prompts
 
 logger = logging.getLogger(__name__)
@@ -560,6 +560,26 @@ async def cmd_generate_evening(message: Message, bot: Bot):
     if not _is_admin(message):
         return
     await _do_generate(message, bot, "evening")
+
+
+@router.message(Command("story"))
+async def cmd_story(message: Message, bot: Bot):
+    """/story — сгенерировать один channel-слот сторис и прислать на модерацию."""
+    if not _is_admin(message):
+        return
+    await message.answer(
+        "\U0001F5BC\uFE0F Генерирую сторис-слот, подожди ~30-60 сек\u2026"
+    )
+    try:
+        job_id = await stories.generate_channel_slot()
+    except Exception:
+        logger.exception("cmd_story: ошибка генерации слота")
+        await message.answer("\u26A0\uFE0F Ошибка генерации сторис (см. логи).")
+        return
+    if not job_id:
+        await message.answer("\u26A0\uFE0F Слот не создан (пустой ответ ИИ?).")
+        return
+    await send_story_for_moderation(bot, int(job_id))
 
 
 # ---------- модерация: кнопка → спросить фидбэк (FSM) ----------

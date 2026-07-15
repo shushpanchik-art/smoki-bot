@@ -343,6 +343,19 @@ async def get_pending_story_jobs() -> list[dict]:
         return [dict(r) for r in rows]
 
 
+async def get_due_pending_story_jobs(now_iso: str) -> list[dict]:
+    """pending-слоты с наступившим publish_at (для отправки на модерацию)."""
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM story_jobs WHERE status = 'pending' "
+            "AND (publish_at IS NULL OR publish_at <= ?) ORDER BY id ASC",
+            (now_iso,),
+        )
+        rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
+
 async def get_published_story_images(limit: int = 200) -> list[dict]:
     """Готовые картинки для реюза во flood (status=published, есть image_path)."""
     async with aiosqlite.connect(config.DB_PATH) as db:

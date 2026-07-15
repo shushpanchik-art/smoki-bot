@@ -30,6 +30,7 @@ class ModerationStates(StatesGroup):
     waiting_liked_edit = State()
     waiting_censor_edit = State()
     waiting_custom_topic = State()
+    waiting_story_reject_fb = State()
 
 
 def _is_admin_id(uid: int) -> bool:
@@ -833,3 +834,108 @@ async def fb_reject(message: Message, bot: Bot, state: FSMContext):
         await message.answer(f"🚫 Реген не прошёл цензуру: {res.get('reason','')[:400]}")
         return
     await send_for_moderation(bot, res["article_id"])
+
+# ---------- U6.4: approve-flow сторис (userbot публикует approved) ----------
+
+
+def _story_kb(job_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="\u2705 Опубликовать",
+                             callback_data=f"story:ok:{job_id}"),
+        InlineKeyboardButton(text="\u274C Отклонить",
+                             callback_data=f"story:rej:{job_id}"),
+        InlineKeyboardButton(text="\u26D4 Отмена",
+                             callback_data=f"story:cancel:{job_id}"),
+    ]])
+
+
+async def send_story_for_moderation(bot: Bot, job_id: int):
+    """Отправить сторис-слот админу на модерацию (U6.4)."""
+    job = await db.get_story_job(job_id)
+    if not job:
+        logger.warning("send_story_for_moderation: job #%s не найден", job_id)
+        return
+    if job.get("status") != "pending":
+        logger.info("story #%s не pending (%s) — пропуск модерации",
+                    job_id, job.get("status"))
+        return
+    target = job.get("target") or "?"
+    theme = job.get("theme")
+    header = (f"\U0001F4F8 <b>Сторис #{job_id}</b> "
+              f"[{target}, тема {theme}]\n\n")
+    mid = await publisher.send_photo_with_text(
+        bot, config.ADMIN_CHAT_ID, job.get("image_path"),
+        job.get("caption") or "", header=header,
+        reply_markup=_story_kb(job_id),
+    )
+    if mid:
+        await db.update_story_job(job_id, message_id=mid)
+
+
+def _story_arg(cq: CallbackQuery) -> int:
+    try:
+        return int((cq.data or "").rsplit(":", 1)[-1])
+    except (ValueError, IndexError):
+        return 0
+
+
+@router.callback_query(F.data.startswith("story:ok:"))
+async def cb_story_ok(cq: CallbackQuery):
+    if not await _cb_guard(cq):
+        return
+    job_id = _story_arg(cq)
+    await db.update_story_job(job_id, status="approved")
+    await _clear_markup(cq)
+    await cq.answer("Одобрено \u2705")
+    msg = await _cb_msg(cq)
+    if msg:
+        await msg.answer(f"\u2705 Сторис #{job_id} одобрена — "
+                         f"userbot опубликует по расписанию.")
+
+
+@router.callback_query(F.data.startswith("story:cancel:"))
+async def cb_story_cancel(cq: CallbackQuery):
+    if not await _cb_guard(cq):
+        return
+    job_id = _story_arg(cq)
+    await db.update_story_job(job_id, status="cancelled")
+    await _clear_markup(cq)
+    await cq.answer("Пропущено")
+    msg = await _cb_msg(cq)
+    if msg:
+        await msg.answer(f"\u26D4 Сторис #{job_id} пропущена (cancelled).")
+
+
+@router.callback_query(F.data.startswith("story:rej:"))
+async def cb_story_rej(cq: CallbackQuery, state: FSMContext):
+    if not await _cb_guard(cq):
+        return
+    job_id = _story_arg(cq)
+    await _clear_markup(cq)
+    await cq.answer()
+    await state.set_state(ModerationStates.waiting_story_reject_fb)
+    await state.update_data(story_job_id=job_id)
+    msg = await _cb_msg(cq)
+    if msg:
+        await msg.answer(f"\u270F\uFE0F Что не так со сторис #{job_id}? "
+                         f"Напишите замечание (или \u201C-\u201D чтобы "
+                         f"просто отклонить).")
+
+
+@router.message(ModerationStates.waiting_story_reject_fb)
+async def fb_story_reject(message: Message, state: FSMContext):
+    if not _is_admin(message):
+        return
+    data = await state.get_data()
+    job_id = int(data.get("story_job_id") or 0)
+    await state.clear()
+    fb = message.text or ""
+    fields: dict = {"status": "rejected"}
+    if not _is_skip(fb):
+        fields["feedback"] = fb
+    await db.update_story_job(job_id, **fields)
+    await message.answer(
+        f"\u274C Сторис #{job_id} отклонена. Замечание сохранено — "
+        f"будет учтено при регенерации."
+    )
+

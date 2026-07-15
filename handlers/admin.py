@@ -139,6 +139,9 @@ def _admin_kb() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="📸 Сторис (сейчас)", callback_data="adm_story"),
         ],
         [
+            InlineKeyboardButton(text="\U0001F5D3 Расписания", callback_data="adm_schedule"),
+        ],
+        [
             InlineKeyboardButton(text="\U0001F4BE Сделать бэкап", callback_data="adm_backup"),
         ],
     ])
@@ -185,6 +188,24 @@ async def _cb_guard(cq: CallbackQuery) -> bool:
         await cq.answer("Нет доступа.", show_alert=True)
         return False
     return True
+
+
+@router.callback_query(F.data == "adm_schedule")
+async def cb_adm_schedule(cq: CallbackQuery):
+    """U8.1 — показать расписания (APScheduler + systemd-таймеры). Просмотр."""
+    msg = await _cb_msg(cq)
+    if not await _cb_guard(cq) or msg is None:
+        return
+    await cq.answer()
+    from services import schedule_view
+    text = await schedule_view.build_schedule_text()
+    if hasattr(msg, "edit_text"):
+        try:
+            await msg.edit_text(text, parse_mode="HTML", reply_markup=_back_kb())
+            return
+        except Exception:
+            pass
+    await msg.answer(text, parse_mode="HTML", reply_markup=_back_kb())
 
 
 @router.callback_query(F.data == "adm_gen")

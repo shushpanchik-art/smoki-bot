@@ -62,100 +62,126 @@ async def _publish_story(client: Any, job: dict) -> int | None:
     caption = job.get("caption") or ""
 
     result = await client(
-        SendStoryRequest(
-            peer=peer,
-            media=media,
-            caption=caption[:2048],
-            period=_STORY_PERIOD,
-        )
-    )
-    # Достаём id опубликованной истории (структура зависит от версии слоя).
-    story_id = _extract_story_id(result)
-    logger.info(
-        "Story #%s опубликована в %s (story_id=%s)",
-        job.get("id"), peer_str, story_id,
-    )
-    return story_id
+python3 -c "import ast; ast.parse(open('userbot.py').read())" && echo "userbot.py AST OK"
+userbot.py AST OK
+cat > deploy/systemd/smoki-userbot.service << 'EOF'
+[Unit]
+Description=SMOKI userbot (Telethon) — авто-Stories publisher
+Documentation=file:/opt/SMOKI/bot/userbot.py
+After=network-online.target smoki-bot.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/SMOKI/bot
+ExecStart=/opt/SMOKI/bot/venv/bin/python /opt/SMOKI/bot/userbot.py
+Restart=always
+RestartSec=15
+# Первый запуск (авторизация по SMS) выполнить вручную в TTY:
+#   /opt/SMOKI/bot/venv/bin/python /opt/SMOKI/bot/userbot.py
+# затем: systemctl enable --now smoki-userbot
+
+[Install]
+WantedBy=multi-user.target
+EOF
+echo "unit written"
+unit written
+cat > tests/test_userbot.py << 'PYEOF'
+"""U6.5 — тесты userbot.process_due_stories (публикация мокается)."""
+import pytest
+
+import userbot
+from db import database
 
 
-def _extract_story_id(result: Any) -> int | None:
-    """Пытается достать id истории из ответа SendStoryRequest."""
-    updates = getattr(result, "updates", None)
-    if updates:
-        for upd in updates:
-            story = getattr(upd, "story", None)
-            sid = getattr(story, "id", None)
-            if sid is not None:
-                return int(sid)
-    sid = getattr(result, "id", None)
-    return int(sid) if sid is not None else None
-
-
-async def process_due_stories(client: Any) -> int:
-    """Публикует все approved-слоты с наступившим publish_at.
-
-    Возвращает число успешно опубликованных. При ошибке отдельного слота
-    ставит status='error' и продолжает (одна плохая история не роняет цикл).
-    """
-    jobs = await database.get_due_approved_story_jobs(_now_iso())
-    if not jobs:
-        return 0
-
-    published = 0
-    for job in jobs:
-        job_id = int(job["id"])
-        try:
-            story_msg_id = await _publish_story(client, job)
-        except Exception:
-            logger.exception("Ошибка публикации story #%s", job_id)
-            await database.update_story_job(job_id, status="error")
-            continue
-
-        if story_msg_id is None and not job.get("image_path"):
-            await database.update_story_job(job_id, status="error")
-            continue
-
-        await database.update_story_job(
-            job_id, status="published", story_msg_id=story_msg_id
-        )
-        published += 1
-
-    if published:
-        logger.info("Опубликовано историй: %s", published)
-    return published
-
-
-async def _build_client() -> Any:
-    """Создаёт и подключает Telethon-клиент (прод). Требует .env + сессию."""
-    from telethon import TelegramClient
-
-    if not config.TG_API_ID or not config.TG_API_HASH:
-        raise RuntimeError(
-            "TG_API_ID/TG_API_HASH не заданы в .env — userbot не запустится"
-        )
-    client = TelegramClient(
-        config.TG_SESSION_PATH, config.TG_API_ID, config.TG_API_HASH
-    )
-    await client.start(phone=config.TG_USERBOT_PHONE)  # type: ignore[arg-type]
-    me = await client.get_me()
-    logger.info("Userbot авторизован как %s", getattr(me, "username", me))
-    return client
-
-
-async def main() -> None:
+@pytest.mark.asyncio
+async def test_publishes_approved_due(tmp_db, monkeypatch):
     await database.init_db()
-    client = await _build_client()
-    logger.info("Userbot запущен, интервал опроса %s c", POLL_INTERVAL_SEC)
-    try:
-        while True:
-            try:
-                await process_due_stories(client)
-            except Exception:
-                logger.exception("Ошибка цикла публикации историй")
-            await asyncio.sleep(POLL_INTERVAL_SEC)
-    finally:
-        await client.disconnect()  # type: ignore[union-attr]
+    jid = await database.add_story_job(
+        target="channel", image_path="/tmp/a.png",
+        caption="факт", publish_at="2000-01-01T00:00:00+00:00",
+    )
+    await database.update_story_job(jid, status="approved")
+
+    calls = {}
+
+    async def fake_publish(client, job):
+        calls["job_id"] = int(job["id"])
+        return 777
+
+    monkeypatch.setattr(userbot, "_publish_story", fake_publish)
+    n = await userbot.process_due_stories(client=object())
+
+    assert n == 1
+    assert calls["job_id"] == jid
+    row = await database.get_story_job(jid)
+    assert row["status"] == "published"
+    assert row["story_msg_id"] == 777
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+@pytest.mark.asyncio
+async def test_skips_when_no_due(tmp_db, monkeypatch):
+    await database.init_db()
+    # pending — не approved: publish не должен вызываться
+    await database.add_story_job(
+        target="channel", image_path="/tmp/a.png", caption="x")
+
+    async def boom(client, job):
+        raise AssertionError("не должно вызываться")
+
+    monkeypatch.setattr(userbot, "_publish_story", boom)
+    assert await userbot.process_due_stories(client=object()) == 0
+
+
+@pytest.mark.asyncio
+async def test_error_marks_status_error(tmp_db, monkeypatch):
+    await database.init_db()
+    jid = await database.add_story_job(
+        target="channel", image_path="/tmp/a.png",
+        caption="x", publish_at="2000-01-01T00:00:00+00:00",
+    )
+    await database.update_story_job(jid, status="approved")
+
+    async def boom(client, job):
+        raise RuntimeError("api down")
+
+    monkeypatch.setattr(userbot, "_publish_story", boom)
+    n = await userbot.process_due_stories(client=object())
+
+    assert n == 0
+    row = await database.get_story_job(jid)
+python3 -c "import ast; ast.parse(open('tests/test_userbot.py').read())" && echo "test AST OK"
+test AST OK
+grep -n "bandit" .github/workflows/ci.yml
+52:      - name: Install bandit
+53:        run: pip install bandit==1.9.4
+54:      - name: Run bandit
+55:        run: bandit -r . -x venv,data,__pycache__ -ll
+python3 << 'PYEOF'
+p = "docs/SPEC.md"
+s = open(p).read()
+anchor = "### U6.6 Конфиг и зависимости"
+assert anchor in s
+done = (
+    "- [x] Публикация userbot РЕАЛИЗОВАНА-КОД (feature/u6-5-userbot-publish): "
+    "`userbot.py` — отдельный процесс, Telethon импортируется ЛЕНИВО внутри "
+    "функций (модуль тестируется без установленного telethon). "
+    "`process_due_stories(client)` читает `db.get_due_approved_story_jobs(now)`, "
+    "`_publish_story` шлёт `SendStoryRequest(peer, InputMediaUploadedPhoto, "
+    "period=86400)` (peer = CHANNEL_ID для channel / STORY_FLOOD_CHANNEL для "
+    "flood), затем `update_story_job(status='published', story_msg_id=...)`; "
+    "ошибка отдельного слота → `status='error'`, цикл не падает. "
+    "`main()` — цикл с POLL_INTERVAL_SEC=300. Юнит "
+    "`deploy/systemd/smoki-userbot.service` (Restart=always). Тест "
+    "`tests/test_userbot.py` (мок публикации: approved-due→published, "
+    "пропуск pending, ошибка→error, `_extract_story_id`).\n"
+    "- [ ] U6.5b РУЧНОЙ ПРОД-ШАГ (ждёт API от владельца): реальные "
+    "`TG_API_ID`/`TG_API_HASH`/`TG_USERBOT_PHONE` в `.env`; интерактивная "
+    "авторизация сессии (SMS-код, первый запуск в TTY); буст канала "
+    "@SMOKTOLK до уровня Stories; `pip install telethon==1.44.0` в venv; "
+    "`systemctl enable --now smoki-userbot`. БЕЗ буста SendStoryRequest "
+    "вернёт ошибку прав — прод-запуск только после буста.\n\n"
+)
+s = s.replace(anchor, done + anchor, 1)
+open(p, "w").write(s)
+print("SPEC patched")

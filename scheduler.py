@@ -385,3 +385,11 @@ def start(bot) -> AsyncIOScheduler:
     _scheduler = sched
     logger.info("Планировщик запущен (persistent jobstore: %s)", config.DB_PATH)
     return sched
+
+
+def get_scheduler() -> AsyncIOScheduler | None:
+    """Вернуть активный планировщик (или None, если ещё не стартовал).
+
+    Нужен админ-панели (U8) для чтения списка джоб и их next_run_time.
+    """
+    return _scheduler

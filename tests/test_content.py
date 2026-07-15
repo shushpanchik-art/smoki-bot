@@ -88,3 +88,24 @@ async def test_censor_returns_edited_text(monkeypatch):
     ok, res = await content.censor("оригинал")
     assert ok is True
     assert res == edited
+
+
+def test_clean_html_markdown_bold_to_html():
+    assert content._clean_html("**жирный**") == "<b>жирный</b>"
+    assert content._clean_html("__тоже__") == "<b>тоже</b>"
+
+
+def test_clean_html_markdown_italic_to_html():
+    assert content._clean_html("*курсив*") == "<i>курсив</i>"
+    assert content._clean_html("текст _вот_ тут") == "текст <i>вот</i> тут"
+
+
+def test_clean_html_keeps_existing_html():
+    assert content._clean_html("<b>ready</b>") == "<b>ready</b>"
+
+
+def test_clean_html_does_not_break_urls_and_words():
+    # подчёркивания в URL и snake_case, умножение — не курсив
+    assert content._clean_html("https://ex.com/a_b_c") == "https://ex.com/a_b_c"
+    assert content._clean_html("snake_case_var") == "snake_case_var"
+    assert content._clean_html("5 * 3 = 15") == "5 * 3 = 15"

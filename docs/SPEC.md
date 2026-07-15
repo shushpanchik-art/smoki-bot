@@ -65,7 +65,7 @@ venv/bin/ruff check <файл> --fix
 
 Полный прогон как в CI (джоба Ruff lint):
 
-venv/bin/ruff check . --exclude venv,data,__pycache__
+venv/bin/ruff check . --exclude venv,data,**pycache**
 
 Это ловит ошибки (F541, неиспользуемые импорты и т.п.) до GitHub Actions и экономит запуски CI. Версии ruff/mypy в venv обязаны совпадать с CI: ruff==0.15.12, mypy==1.14.1.
 
@@ -91,7 +91,7 @@ Message|InaccessibleMessage. При /start отправляется ReplyKeyboar
 
 1. Python syntax check (компиляция)
 2. Ruff lint (ruff==0.15.12)
-3. Bandit security (bandit==1.9.4, -ll, -x venv,data,__pycache__)
+3. Bandit security (bandit==1.9.4, -ll, -x venv,data,**pycache**)
 4. pip-audit
 5. Pytest + coverage (--cov-fail-under=45)
 6. codespell
@@ -170,16 +170,18 @@ Message|InaccessibleMessage. При /start отправляется ReplyKeyboar
 
 ## Выученные уроки (операционные)
 
-- __Беспарольный рестарт__: настроен sudoers drop-in `/etc/sudoers.d/smoki-bot`
+- **Формат картинки 4:5 (best practice)**: на мобильных постах Telegram картинка 4:5 (портрет) смотрится лучше квадрата/горизонта — занимает больше экрана, выше вовлечённость. Подтверждено тестом владельца на телефоне. Реализация — `ai/gemini._crop_landscape(ratio=4/5)` (дефолт), кроп квадрата 1024x1024 на нашей стороне (SDK не умеет `aspect_ratio`). НЕ откатывать к 3:2/квадрату. См. §U7.
+
+- **Беспарольный рестарт**: настроен sudoers drop-in `/etc/sudoers.d/smoki-bot`
   (по образцу `smoktolk-bot`). Разрешены без пароля: `systemctl restart/start/stop/status smoki-bot`.
   Проверка синтаксиса перед активацией обязательна: `sudo visudo -c`.
   Тест: `sudo -n systemctl restart smoki-bot` (флаг `-n` = не спрашивать пароль).
-- __Чистка веток-зомби__: смёрженные локальные ветки удалять `git branch -d <name>`;
+- **Чистка веток-зомби**: смёрженные локальные ветки удалять `git branch -d <name>`;
   устаревшие remote-tracking refs — `git remote prune origin`.
   После merge PR через UI удалённая ветка на GitHub исчезает, локально остаётся зомби.
-- __Кэш байткода__: каталоги `__pycache__` покрыты `.gitignore`, git их не видит; периодически чистить
-  `find . -path ./venv -prune -o -name __pycache__ -type d -exec rm -rf {} +`.
-- __journalctl__: для свежих логов после рестарта надёжнее `--since` по времени,
+- **Кэш байткода**: каталоги `**pycache**` покрыты `.gitignore`, git их не видит; периодически чистить
+  `find . -path ./venv -prune -o -name **pycache** -type d -exec rm -rf {} +`.
+- **journalctl**: для свежих логов после рестарта надёжнее `--since` по времени,
   чем `-n50` (последнее может захватить хвост старого процесса).
 
 ## Эксплуатация: CI troubleshooting
@@ -381,11 +383,16 @@ P3 — nice-to-have. Разведка перед реализацией обяз
 - requirements: `telethon`.
 - `.env`/`.env.example` дополнены (U6.2a): `STORY_WEIGHT_JOKE`, `STORY_WEIGHT_NEWS`, `STORY_WEIGHT_NEW_PRODUCTS`, `STORY_WEIGHT_FACT`, `STORY_WEIGHT_WISH`, `STORY_CHANNEL_MIN_PER_DAY`, `STORY_CHANNEL_MAX_PER_DAY`, `STORY_FLOOD_MIN_PER_DAY`, `STORY_FLOOD_MAX_PER_DAY`, `STORY_APPROVE_TIMEOUT_MIN` (значения = дефолты config).
 
-### U7 — Формат картинки поста (открытый вопрос)
+### U7 — Формат картинки поста (РЕШЕНО: 4:5)
 
-- Сейчас `ai/gemini._crop_landscape(ratio=4/5)` центрально кропает
-  1024x1024 в портрет 4:5. NanoBanana всегда отдаёт квадрат, SDK не умеет
-  `aspect_ratio`.
-- TODO: решить, оставить 4:5 или вернуть квадрат 1024x1024. Откат =
-  вызвать `_crop_landscape(data, ratio=1)` либо отдать оригинал без кропа
-  в `ai/gemini.py` (строка ~206). Требует подтверждения владельца.
+- РЕШЕНИЕ ВЛАДЕЛЬЦА (подтверждено тестом на телефоне): формат картинки
+  постов — портрет **4:5**. На мобильных статьи с 4:5 смотрятся лучше всего
+  (картинка занимает больше экрана, выше вовлечённость). Откат к квадрату/3:2
+  НЕ делаем.
+- Реализация: `ai/gemini._crop_landscape(ratio=4/5)` (дефолт) центрально
+  кропает квадрат 1024x1024 от NanoBanana в 4:5. SDK не умеет `aspect_ratio`,
+  поэтому кроп на нашей стороне — это штатный и одобренный путь.
+- Промпты картинки (`image_prompt`, `image_prompt_from_scene`) соотношение
+  сторон НЕ задают (модель всё равно отдаёт квадрат) — важно лишь требование
+  «fill frame edge to edge, no bars», чтобы после кропа не было полос.
+- Тест-инвариант: `tests/test_image_crop.py` фиксирует дефолт `ratio=4/5`.

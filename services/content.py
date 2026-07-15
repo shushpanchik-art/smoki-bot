@@ -87,7 +87,7 @@ async def censor(text: str) -> tuple[bool, str]:
 
 
 def _clean_html(text: str) -> str:
-    """Убрать запрещённые для Telegram теги, оставить разрешённые."""
+    """Убрать запрещённые для Telegram теги, конвертировать Markdown в HTML."""
     # срезать возможные ```html ... ```
     text = re.sub(r"^```(?:html)?\s*|\s*```$", "", text.strip())
     # заменить неподдерживаемые теги на переносы/жирный
@@ -95,6 +95,15 @@ def _clean_html(text: str) -> str:
     text = re.sub(r"<li>", "• ", text, flags=re.I)
     text = re.sub(r"</?(ul|ol|p|div|br)\s*/?>", "\n", text, flags=re.I)
     text = re.sub(r"</li>", "\n", text, flags=re.I)
+    # Markdown -> HTML (модель иногда игнорит запрет и сыплет **/*/_)
+    # порядок важен: сначала двойные ** и __, потом одинарные * и _
+    text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text, flags=re.S)
+    text = re.sub(r"__(.+?)__", r"<b>\1</b>", text, flags=re.S)
+    # одинарные * / _ -> курсив, только парные вокруг непустого текста
+    text = re.sub(r"(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])",
+                  r"<i>\1</i>", text, flags=re.S)
+    text = re.sub(r"(?<![\w_])_(?!\s)(.+?)(?<!\s)_(?![\w_])",
+                  r"<i>\1</i>", text, flags=re.S)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
 

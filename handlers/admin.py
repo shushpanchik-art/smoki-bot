@@ -327,7 +327,14 @@ async def cb_adm_stats(cq: CallbackQuery):
         f"\U0001F5D1 Комментов удалено: <b>{s['comments_deleted']}</b>\n"
         f"\U0001F916 Вызовов ИИ: <b>{s['ai_calls']}</b>\n"
         f"\U0001F9EE Токенов израсходовано: <b>{s['tokens_total']}</b>\n"
-        f"\U0001F553 Последняя публикация: <b>{last}</b>"
+        f"\U0001F4B5 Расход AI: <b>${s['cost_total_usd']:.2f}</b>"
+        + (f" из <b>${s['budget_usd']:.2f}</b>"
+           if s['budget_usd'] > 0 else "")
+        + "\n"
+        + (f"\U0001F4E6 Осталось постов в бюджете: "
+           f"<b>~{s['posts_left_est']}</b>\n"
+           if s['budget_usd'] > 0 and s['posts_left_est'] else "")
+        + f"\U0001F553 Последняя публикация: <b>{last}</b>"
     )
     await msg.answer(text, parse_mode="HTML")
 

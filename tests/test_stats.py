@@ -15,6 +15,9 @@ async def test_get_stats_empty_db(tmp_db):
     assert s["comments_new"] == 0
     assert s["ai_calls"] == 0
     assert s["tokens_total"] == 0
+    assert s["cost_total_usd"] == 0.0
+    assert s["budget_usd"] == 0.0
+    assert s["posts_left_est"] == 0
     assert s["last_published"] is None
 
 
@@ -28,6 +31,8 @@ async def test_get_stats_counts_topics(tmp_db):
         "topics", "comments_replied", "comments_deleted",
         "comments_total", "comments_new",
         "ai_calls", "tokens_total", "last_published",
+        "cost_total_usd", "avg_cost_per_post_usd",
+        "budget_usd", "posts_left_est",
     }
 
 
@@ -45,3 +50,20 @@ async def test_get_stats_counts_comments(tmp_db):
     assert s["comments_replied"] == 1
     assert s["comments_deleted"] == 1
     assert s["comments_new"] == 1
+
+
+
+async def test_get_stats_cost(tmp_db, monkeypatch):
+    """U9a: cost_total_usd = токены/1M*прайс + картинки*прайс."""
+    import config
+    monkeypatch.setattr(config, "PRICE_TEXT_IN_USD_PER_1M", 1.0)
+    monkeypatch.setattr(config, "PRICE_TEXT_OUT_USD_PER_1M", 2.0)
+    monkeypatch.setattr(config, "PRICE_IMAGE_USD", 0.5)
+    monkeypatch.setattr(config, "MONTHLY_BUDGET_USD", 0.0)
+    await db.init_db()
+    # 1M input, 500k output, 2 картинки
+    await db.log_ai("text", "m", input_tokens=1_000_000,
+                    output_tokens=500_000, images=2)
+    s = await db.get_stats()
+    # 1.0 + 1.0 + 1.0 = 3.0
+    assert s["cost_total_usd"] == 3.0

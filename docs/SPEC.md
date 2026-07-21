@@ -379,6 +379,7 @@ P3 — nice-to-have. Разведка перед реализацией обяз
   (без буста метод вернёт ошибку прав — прод-запуск только после буста).
 
 - [x] Публикация userbot РЕАЛИЗОВАНА-КОД (feature/u6-5-userbot-publish): `userbot.py` — отдельный процесс, Telethon импортируется ЛЕНИВО внутри функций (модуль тестируется без установленного telethon). `process_due_stories(client)` читает `db.get_due_approved_story_jobs(now)`, `_publish_story` шлёт `SendStoryRequest(peer, InputMediaUploadedPhoto, period=86400)` (peer = CHANNEL_ID для channel / STORY_FLOOD_CHANNEL для flood), затем `update_story_job(status='published', story_msg_id=...)`; ошибка отдельного слота → `status='error'`, цикл не падает. `main()` — цикл с POLL_INTERVAL_SEC=300. Юнит `deploy/systemd/smoki-userbot.service` (Restart=always). Тест `tests/test_userbot.py` (мок публикации: approved-due→published, пропуск pending, ошибка→error, `_extract_story_id`).
+
 ### U6.STORIES-FROZEN — экономика Stories и решение [ЗАМОРОЖЕНО]
 
 **СТАТУС: заморожено — экономически нецелесообразно.** Публикация Stories
@@ -389,6 +390,7 @@ P3 — nice-to-have. Разведка перед реализацией обяз
 
 **Правило уровней Stories (факт Telegram 2025):** Level = число Stories в
 день.
+
 - Level 1 → 1 story/день
 - Level 2 → 2 story/день
 - Level 3 → 3 story/день
@@ -403,6 +405,7 @@ P3 — nice-to-have. Разведка перед реализацией обяз
 уровень 9 → `коэффициент × 7`; уровень 10+ → `коэффициент × уровень`.
 
 Примеры:
+
 - Канал <250 подписчиков (коэффициент 1): Level 1 ≈ 1 буст, Level 2 ≈ 1 буст,
   Level 3 ≈ 2 буста.
 - Канал 1000 подписчиков (коэффициент 5): Level 1 = 3 буста, Level 2 = 5,

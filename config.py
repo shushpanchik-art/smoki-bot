@@ -12,6 +12,14 @@ def _int(name: str, default: int) -> int:
         return default
 
 
+def _float(name: str, default: float) -> float:
+    val = os.getenv(name)
+    try:
+        return float(val) if val else default
+    except ValueError:
+        return default
+
+
 # --- Telegram ---
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 CHANNEL_ID = os.getenv("CHANNEL_ID", "@SMOKTOLK")
@@ -100,3 +108,12 @@ STORY_FLOOD_MAX_PER_DAY = _int("STORY_FLOOD_MAX_PER_DAY", 12)
 STORY_APPROVE_TIMEOUT_MIN = _int("STORY_APPROVE_TIMEOUT_MIN", 60)
 # Час дня, когда планировщик раскладывает дневные story-слоты
 STORY_PLAN_HOUR = _int("STORY_PLAN_HOUR", 8)
+
+
+# --- U9a: оценка стоимости AI ($) и бюджет ---
+# Прайс Gemini 2.5 Flash (pay-as-you-go), $/1M токенов и $/картинку.
+# Обновлять вручную при смене тарифов Google.
+PRICE_TEXT_IN_USD_PER_1M = _float("PRICE_TEXT_IN_USD_PER_1M", 0.30)
+PRICE_TEXT_OUT_USD_PER_1M = _float("PRICE_TEXT_OUT_USD_PER_1M", 2.50)
+PRICE_IMAGE_USD = _float("PRICE_IMAGE_USD", 0.039)
+MONTHLY_BUDGET_USD = _float("MONTHLY_BUDGET_USD", 0.0)

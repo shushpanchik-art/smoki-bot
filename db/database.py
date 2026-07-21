@@ -259,6 +259,27 @@ async def get_stats() -> dict:
             "SELECT COALESCE(SUM(input_tokens), 0) "
             "+ COALESCE(SUM(output_tokens), 0) FROM ai_logs")
 
+        async def _sum(sql: str, args: tuple = ()) -> float:
+            cur = await conn.execute(sql, args)
+            row = await cur.fetchone()
+            return float(row[0]) if row and row[0] is not None else 0.0
+
+        # U9a: оценка стоимости AI по прайсу из config
+        in_tok = await _sum("SELECT COALESCE(SUM(input_tokens), 0) FROM ai_logs")
+        out_tok = await _sum(
+            "SELECT COALESCE(SUM(output_tokens), 0) FROM ai_logs")
+        img_cnt = await _sum("SELECT COALESCE(SUM(images), 0) FROM ai_logs")
+        cost_total = (
+            in_tok / 1_000_000 * config.PRICE_TEXT_IN_USD_PER_1M
+            + out_tok / 1_000_000 * config.PRICE_TEXT_OUT_USD_PER_1M
+            + img_cnt * config.PRICE_IMAGE_USD
+        )
+        budget = config.MONTHLY_BUDGET_USD
+        avg_cost_post = (cost_total / published) if published else 0.0
+        posts_left = 0
+        if budget > 0 and avg_cost_post > 0:
+            posts_left = max(0, int((budget - cost_total) / avg_cost_post))
+
         cur = await conn.execute(
             "SELECT published_at FROM articles "
             "WHERE status = 'published' AND published_at IS NOT NULL "
@@ -277,6 +298,10 @@ async def get_stats() -> dict:
         "comments_new": comments_new,
         "ai_calls": ai_calls,
         "tokens_total": tokens_total,
+        "cost_total_usd": round(cost_total, 4),
+        "avg_cost_per_post_usd": round(avg_cost_post, 4),
+        "budget_usd": round(budget, 2),
+        "posts_left_est": posts_left,
         "last_published": last_published,
     }
 

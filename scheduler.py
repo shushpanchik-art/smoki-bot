@@ -44,8 +44,10 @@ async def _generate_and_moderate(length_hint: str, label: str):
 
 async def _job_morning():
     """Утро: 1-3 факта + остроумный коммент → модерация."""
-    n = int(await database.get_setting("morning_facts",
-                                       str(config.MORNING_LEN_DEFAULT)) or config.MORNING_LEN_DEFAULT)
+    n_max = int(await database.get_setting("morning_facts",
+                                           str(config.MORNING_LEN_DEFAULT)) or config.MORNING_LEN_DEFAULT)
+    n = random.randint(1, max(1, n_max))
+    logger.info("Утро: публикуем %d факт(ов) (max=%d)", n, n_max)
     await _generate_and_moderate(prompts.facts_rules(n), "утро")
 
 

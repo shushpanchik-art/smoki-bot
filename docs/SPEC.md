@@ -50,7 +50,7 @@
 - services (content.py, publisher.py, comments.py)
 - handlers (admin.py, group.py, ROUTERS)
 - scripts/ai_healthcheck.py
-- docs (SPEC.md, TESTING.md, PROJECT_BOOK.txt)
+- docs (SPEC.md, TESTING.md, PROJECT_BOOK.txt, DEPS_TREE.txt — дерево зависимостей venv, pipdeptree)
 
 ## Локальные проверки перед push (обязательно)
 

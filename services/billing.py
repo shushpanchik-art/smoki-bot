@@ -28,7 +28,7 @@ def _sync_fetch() -> dict:
         return {"available": False, "reason": "не настроено (нет проекта/датасета)"}
 
     # Импорт внутри функции: если пакет не установлен — не роняем весь модуль.
-    from google.cloud import bigquery  # type: ignore[attr-defined]
+    from google.cloud import bigquery
 
     client = bigquery.Client(project=project)
 

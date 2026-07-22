@@ -6,3 +6,4 @@ SQLAlchemy==2.0.51
 python-dotenv==1.2.2
 Pillow==12.3.0
 telethon==1.44.0
+google-cloud-bigquery==3.27.0

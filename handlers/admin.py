@@ -14,7 +14,7 @@ from aiogram.types import (
 
 import config
 from db import database as db
-from services import content, publisher, stories
+from services import content, publisher, stories, billing
 from ai import prompts
 
 logger = logging.getLogger(__name__)
@@ -314,6 +314,20 @@ async def cb_adm_stats(cq: CallbackQuery):
         return
     await cq.answer()
     s = await db.get_stats()
+    cloud = await billing.get_cloud_costs()
+    if cloud.get("available"):
+        cur = cloud.get("currency", "USD")
+        cloud_line = (
+            f"\u2601\uFE0F Факт Cloud ({cloud['month']}): "
+            f"<b>{cloud['month_cost']:.2f} {cur}</b>"
+            + (f" из <b>${cloud['budget']:.2f}</b>"
+               if cloud.get('budget', 0) > 0 else "")
+            + "\n"
+        )
+    else:
+        cloud_line = (
+            f"\u2601\uFE0F Факт Cloud: <i>{cloud.get('reason', 'нет данных')}</i>\n"
+        )
     last = s.get("last_published") or "—"
     text = (
         "\U0001F4CA <b>Статистика</b>\n\n"
@@ -334,6 +348,7 @@ async def cb_adm_stats(cq: CallbackQuery):
         + (f"\U0001F4E6 Осталось постов в бюджете: "
            f"<b>~{s['posts_left_est']}</b>\n"
            if s['budget_usd'] > 0 and s['posts_left_est'] else "")
+        + cloud_line
         + f"\U0001F553 Последняя публикация: <b>{last}</b>"
     )
     await msg.answer(text, parse_mode="HTML")

@@ -117,3 +117,11 @@ PRICE_TEXT_IN_USD_PER_1M = _float("PRICE_TEXT_IN_USD_PER_1M", 0.30)
 PRICE_TEXT_OUT_USD_PER_1M = _float("PRICE_TEXT_OUT_USD_PER_1M", 2.50)
 PRICE_IMAGE_USD = _float("PRICE_IMAGE_USD", 0.039)
 MONTHLY_BUDGET_USD = _float("MONTHLY_BUDGET_USD", 0.0)
+
+# --- U9b: Google Cloud Billing export (BigQuery) ---
+# Датасет и префикс таблицы billing-экспорта. Таблица создаётся Google
+# автоматически (gcp_billing_export_v1_XXXX). Оба ключа опциональны:
+# если пусто/датасета нет — админка покажет "данные ещё не готовы".
+BILLING_DATASET = os.getenv("BILLING_DATASET", "billing_export")
+BILLING_TABLE_PREFIX = os.getenv("BILLING_TABLE_PREFIX", "gcp_billing_export")
+

@@ -265,10 +265,14 @@ async def cb_adm_gen(cq: CallbackQuery, state: FSMContext):
         return
     await cq.answer()
     await state.set_state(ModerationStates.waiting_custom_topic)
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="\u26D4 Отмена", callback_data="adm_cancel"),
+    ]])
     await msg.answer(
         "\U0001F4DD Пришлите тему/задание для статьи. Можно указать "
         "желаемую длину (напр.: \u201eвред IQOS, 200 слов\u201c). "
-        "Если длину не укажете \u2014 до 150 слов."
+        "Если длину не укажете \u2014 до 150 слов.",
+        reply_markup=kb,
     )
 
 
@@ -287,6 +291,17 @@ async def fb_custom_topic(message: Message, bot: Bot, state: FSMContext):
         max_words = int(m.group(1)) if m else None
     length_hint = prompts.custom_words_rule(max_words, default=150)
     await _do_generate(message, bot, "", topic=topic, length_hint=length_hint)
+
+
+@router.callback_query(F.data == "adm_cancel")
+async def cb_adm_cancel(cq: CallbackQuery, state: FSMContext):
+    if not await _cb_guard(cq):
+        return
+    await state.clear()
+    await cq.answer("Отменено")
+    msg = await _cb_msg(cq)
+    if msg is not None:
+        await msg.answer("\u26D4 Ввод темы отменён.")
 
 
 @router.callback_query(F.data == "adm_gen_m")

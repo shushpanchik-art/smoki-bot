@@ -112,8 +112,10 @@ async def generate_channel_slot(theme: int | None = None,
     try:
         data = await _image(img_prompt)
         if data:
+            hook = await _text(prompts.story_hook_prompt(caption or ""))
+            hook = " ".join((hook or "").split()) or (caption or "")
             data = await asyncio.to_thread(
-                story_render.render_story_caption, data, caption or "",
+                story_render.render_story_caption, data, hook,
             )
             fname = f"story_{int(time.time())}_{uuid.uuid4().hex[:8]}.png"
             fpath = IMAGE_DIR / fname

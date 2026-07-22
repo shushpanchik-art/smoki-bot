@@ -564,9 +564,9 @@ smoktolk_bot, /opt/smoktolk/bot) — автоматически «цепляет
 правом invite), человек подписывается сам в один тап. Массовое добавление
 из списка = бан (см. отклонённую ранее задачу) — здесь НЕ применяем.
 
-- [x] U10a РЕАЛИЗОВАНО (разведка smoktolk_bot): БД users — /opt/smoktolk/bot/db.py (таблица users, get_user/create_user). /start — handlers/start.py (_start_common). Канал @SMOKTOLK привязан через CHANNEL_URL. Всё уже на месте.
-- [x] U10b РЕАЛИЗОВАНО в smoktolk_bot (handlers/start.py _start_common): при первом /start get_user → create_user (сохранение user в БД); повторный /start только update_user_meta — НЕ спамит (идемпотентно). Приветствие: welcome-баннер + дисклеймер. Inline-кнопка «📢 Наш канал @SMOKTOLK» (url=CHANNEL_URL) в keyboards.py. Проверка членства (getChatMember) не делалась — не требовалась.
-- [x] U10c РЕАЛИЗОВАНО (частично): метрика заходов — db.bump_daily('start_clicks') на каждый /start + bump_daily('new_users') для новых (колонка start_clicks в daily_stats, миграция db.py). Видно в админ-панели adm_stats. Число реально подписавшихся на канал через бота Telegram не отдаёт (нет getChatMember-опроса) — метрика заходов признана достаточной.
+- [x] U10a РЕАЛИЗОВАНО (разведка smoktolk_bot): БД users — /opt/smoktolk/bot/db.py (таблица users, `get_user`/`create_user`). /start — handlers/start.py (`_start_common`). Канал @SMOKTOLK привязан через CHANNEL_URL. Всё уже на месте.
+- [x] U10b РЕАЛИЗОВАНО в smoktolk_bot (handlers/start.py `_start_common`): при первом /start `get_user` → `create_user` (сохранение user в БД); повторный /start только `update_user_meta` — НЕ спамит (идемпотентно). Приветствие: welcome-баннер + дисклеймер. Inline-кнопка «📢 Наш канал @SMOKTOLK» (url=CHANNEL_URL) в keyboards.py. Проверка членства (getChatMember) не делалась — не требовалась.
+- [x] U10c РЕАЛИЗОВАНО (частично): метрика заходов — `db.bump_daily('start_clicks')` на каждый /start + `bump_daily('new_users')` для новых (колонка `start_clicks` в `daily_stats`, миграция db.py). Видно в админ-панели adm_stats. Число реально подписавшихся на канал через бота Telegram не отдаёт (нет getChatMember-опроса) — метрика заходов признана достаточной.
 
 Открытый вопрос владельцу: ЭТО ДРУГОЙ ПРОЕКТ (smoktolk_bot). Реализовывать
 там, а не в SMOKI. SMOKI ведёт КАНАЛ, smoktolk_bot работает с подписчиками.

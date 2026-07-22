@@ -8,7 +8,7 @@
 
 - Путь: /opt/SMOKI/bot, venv venv/bin/python
 - systemd: smoki-bot (Restart=always), режим polling
-- Python 3.11.2, aiogram 3.29.1, aiosqlite 0.22.1, apscheduler 3.11.3, SQLAlchemy 2.0.51 (persistent jobstore), python-dotenv 1.2.2, Pillow 12.3.0, telethon 1.44.0
+- Python 3.11.2, aiogram 3.30.0, aiosqlite 0.22.1, apscheduler 3.11.3, SQLAlchemy 2.0.51 (persistent jobstore), python-dotenv 1.2.2, Pillow 12.3.0, telethon 1.44.0, google-genai 2.13.0, google-cloud-bigquery 3.27.0
 - БД smoki.db: published_topics, articles, comments, ai_logs, settings
 - Управление: systemctl restart smoki-bot; journalctl -u smoki-bot -n50
 

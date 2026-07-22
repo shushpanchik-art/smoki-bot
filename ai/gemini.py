@@ -93,7 +93,7 @@ def generate_text(prompt: str, *, temperature: float = 0.9,
     use_search=True подключает Google Search grounding — модель опирается
     на свежие материалы из интернета (актуальные новости/факты).
     """
-    tools: list[types.Tool] | None = (
+    tools: types.ToolListUnion | None = (
         [types.Tool(google_search=types.GoogleSearch())]
         if use_search else None
     )

@@ -109,6 +109,10 @@ STORY_APPROVE_TIMEOUT_MIN = _int("STORY_APPROVE_TIMEOUT_MIN", 60)
 # Час дня, когда планировщик раскладывает дневные story-слоты
 STORY_PLAN_HOUR = _int("STORY_PLAN_HOUR", 8)
 
+# --- Сага: вечером бот рандомно выбирает лонг-рид ИЛИ эпизод саги ---
+SAGA_ENABLED = os.getenv("SAGA_ENABLED", "0") == "1"
+SAGA_RATIO = _float("SAGA_RATIO", 0.7)  # вес саги относительно лонг-рида
+
 
 # --- U9a: оценка стоимости AI ($) и бюджет ---
 # Прайс Gemini 2.5 Flash (pay-as-you-go), $/1M токенов и $/картинку.

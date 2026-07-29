@@ -70,3 +70,27 @@ CREATE TABLE IF NOT EXISTS story_jobs (
   created_at TEXT DEFAULT (datetime('now')),
   publish_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS saga_state (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  episode_number INTEGER DEFAULT 0,
+  arc_number INTEGER DEFAULT 1,
+  arc_goal TEXT,
+  arc_plan_json TEXT DEFAULT '[]',
+  planned_arc_length INTEGER DEFAULT 6,
+  episode_in_arc INTEGER DEFAULT 0,
+  harmon_stage TEXT DEFAULT '1-Ты',
+  characters_json TEXT DEFAULT '{}',
+  locations_json TEXT DEFAULT '[]',
+  last_summary TEXT,
+  prev_message_id INTEGER,
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS saga_summaries (
+  id INTEGER PRIMARY KEY,
+  episode_number INTEGER NOT NULL,
+  arc_number INTEGER NOT NULL,
+  summary TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);

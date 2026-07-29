@@ -10,6 +10,7 @@ async def init_db():
         schema = f.read()
     async with aiosqlite.connect(config.DB_PATH) as db:
         await db.executescript(schema)
+        await _migrate_saga(db)
         await db.commit()
 
 
@@ -186,6 +187,23 @@ async def log_ai(kind: str, model: str, input_tokens: int = 0,
 
 # ---------- settings (редактируемые правила и т.п.) ----------
 # ===== U-saga: saga_state + saga_summaries =====
+
+async def _migrate_saga(db) -> None:
+    """Идемпотентно добавляет новые колонки saga_state в старых БД."""
+    cur = await db.execute("PRAGMA table_info(saga_state)")
+    cols = {row[1] for row in await cur.fetchall()}
+    add = {
+        "narration": "TEXT",
+        "pending_arc_seed": "TEXT",
+        "arc_status": "TEXT DEFAULT 'in_progress'",
+        "arc_synopsis_json": "TEXT DEFAULT '[]'",
+    }
+    for name, decl in add.items():
+        if name not in cols:
+            await db.execute(
+                f"ALTER TABLE saga_state ADD COLUMN {name} {decl}")
+    await db.commit()
+
 
 async def get_saga_state() -> dict | None:
     """Единственная строка состояния саги (id=1) или None если ещё нет."""

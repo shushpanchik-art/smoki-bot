@@ -84,6 +84,10 @@ CREATE TABLE IF NOT EXISTS saga_state (
   locations_json TEXT DEFAULT '[]',
   last_summary TEXT,
   prev_message_id INTEGER,
+  narration TEXT,
+  pending_arc_seed TEXT,
+  arc_status TEXT DEFAULT 'in_progress',
+  arc_synopsis_json TEXT DEFAULT '[]',
   updated_at TEXT DEFAULT (datetime('now'))
 );
 

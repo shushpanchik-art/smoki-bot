@@ -11,7 +11,7 @@ from aiogram import Bot
 import config
 from db import database
 from ai import prompts
-from services import comments, content, publisher, stories
+from services import comments, content, publisher, saga, stories
 
 logger = logging.getLogger("smoki.scheduler")
 
@@ -51,8 +51,44 @@ async def _job_morning():
     await _generate_and_moderate(prompts.facts_rules(n), "утро")
 
 
+async def _publish_saga_episode():
+    """Публикует один эпизод саги сразу в канал reply-цепочкой (без модерации)."""
+    assert _bot is not None
+    bot = _bot
+    body, meta = await saga.generate_episode()
+    state = await database.get_saga_state()
+    reply_to = (state or {}).get("prev_message_id")
+    last_id = None
+    for part in publisher._split(body, publisher.TG_TEXT_LIMIT):
+        if not part.strip():
+            continue
+        msg = await bot.send_message(
+            config.CHANNEL_ID, part, parse_mode="HTML",
+            reply_to_message_id=reply_to,
+        )
+        reply_to = msg.message_id
+        last_id = msg.message_id
+    if last_id is not None:
+        await saga.set_prev_message_id(last_id)
+    logger.info("Сага: эпизод опубликован arc=%s status=%s",
+                meta.get("arc_number"), meta.get("arc_status"))
+
+
 async def _job_evening():
-    """Вечер: лонг-рид заданной длины → модерация."""
+    """Вечер: рандомно лонг-рид (модерация) ИЛИ эпизод саги (сразу в канал).
+
+    Сага реже лонг-рида: вес саги = SAGA_RATIO. При ratio=0.7 →
+    P(сага)=0.7/1.7≈41%, P(лонг-рид)≈59%.
+    """
+    r = config.SAGA_RATIO
+    if config.SAGA_ENABLED and r > 0 and random.random() < r / (1.0 + r):
+        logger.info("Вечер: выпала САГА")
+        try:
+            await _publish_saga_episode()
+            return
+        except Exception:
+            logger.exception("Сага упала — фолбэк на лонг-рид")
+    logger.info("Вечер: лонг-рид")
     w = int(await database.get_setting("evening_words",
                                        str(config.EVENING_WORDS_DEFAULT)) or config.EVENING_WORDS_DEFAULT)
     await _generate_and_moderate(prompts.words_rule(w), "вечер")

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import logging
+import re
 import textwrap
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,18 @@ _MAX_CHARS = 26     # ширина строки для переноса (эмп�
 _MAX_LINES = 6      # больше строк не рисуем (обрезаем с многоточием)
 
 
+_EMOJI_RE = re.compile(
+    "[\U0001F000-\U0001FAFF\U00002600-\U000027BF"
+    "\U0001F1E6-\U0001F1FF\U00002190-\U000021FF"
+    "\U00002B00-\U00002BFF\U0000FE0F\U0000200D]+"
+)
+
+
+def _strip_emoji(text: str) -> str:
+    """Убирает эмодзи: DejaVu их не рисует (получаются квадраты)."""
+    return " ".join(_EMOJI_RE.sub("", text or "").split())
+
+
 def render_story_caption(image_bytes: bytes, caption: str) -> bytes:
     """Кладёт caption на нижнюю часть картинки. Ошибки не критичны — вернём исходник.
 
@@ -40,7 +53,7 @@ def render_story_caption(image_bytes: bytes, caption: str) -> bytes:
         # Приводим к 9:16, заполняя кадр (cover): масштаб + центральный кроп.
         canvas = _fit_cover(src, CANVAS_W, CANVAS_H)
 
-        text = " ".join((caption or "").split())
+        text = _strip_emoji(caption)
         if not text:
             return _to_png(canvas)
 

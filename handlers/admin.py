@@ -1034,13 +1034,22 @@ async def cb_story_ok(cq: CallbackQuery):
     if not await _cb_guard(cq):
         return
     job_id = _story_arg(cq)
-    await db.update_story_job(job_id, status="approved")
+    job = await db.get_story_job(job_id)
+    # Ручной слот без publish_at публикуем немедленно (иначе userbot
+    # его не выберет: WHERE publish_at <= now, а NULL не проходит).
+    if job and not job.get("publish_at"):
+        from datetime import datetime, timezone
+        now_iso = datetime.now(timezone.utc).isoformat()
+        await db.update_story_job(
+            job_id, status="approved", publish_at=now_iso)
+    else:
+        await db.update_story_job(job_id, status="approved")
     await _clear_markup(cq)
     await cq.answer("Одобрено \u2705")
     msg = await _cb_msg(cq)
     if msg:
         await msg.answer(f"\u2705 Сторис #{job_id} одобрена — "
-                         f"userbot опубликует по расписанию.")
+                         f"userbot опубликует в течение ~5 мин.")
 
 
 @router.callback_query(F.data.startswith("story:cancel:"))

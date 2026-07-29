@@ -185,6 +185,61 @@ async def log_ai(kind: str, model: str, input_tokens: int = 0,
 
 
 # ---------- settings (редактируемые правила и т.п.) ----------
+# ===== U-saga: saga_state + saga_summaries =====
+
+async def get_saga_state() -> dict | None:
+    """Единственная строка состояния саги (id=1) или None если ещё нет."""
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute("SELECT * FROM saga_state WHERE id = 1")
+        row = await cur.fetchone()
+        return dict(row) if row else None
+
+
+async def upsert_saga_state(**fields) -> None:
+    """Создаёт (id=1) или обновляет строку состояния саги."""
+    if not fields:
+        return
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        cur = await db.execute("SELECT 1 FROM saga_state WHERE id = 1")
+        exists = await cur.fetchone()
+        if exists:
+            cols = ", ".join(f"{k} = ?" for k in fields)
+            cols += ", updated_at = datetime('now')"
+            vals = list(fields.values()) + [1]
+            await db.execute(
+                f"UPDATE saga_state SET {cols} WHERE id = ?", vals)
+        else:
+            keys = ["id"] + list(fields.keys())
+            marks = ", ".join("?" for _ in keys)
+            vals = [1] + list(fields.values())
+            await db.execute(
+                f"INSERT INTO saga_state ({', '.join(keys)}) "
+                f"VALUES ({marks})", vals)
+        await db.commit()
+
+
+async def add_saga_summary(episode_number: int, arc_number: int,
+                           summary: str) -> None:
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO saga_summaries (episode_number, arc_number, summary) "
+            "VALUES (?, ?, ?)",
+            (episode_number, arc_number, summary),
+        )
+        await db.commit()
+
+
+async def get_saga_summaries() -> list[dict]:
+    """ВСЕ саммари всех эпизодов по порядку — полная память саги."""
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM saga_summaries ORDER BY episode_number ASC")
+        rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
+
 async def get_setting(key: str, default: str | None = None) -> str | None:
     async with aiosqlite.connect(config.DB_PATH) as db:
         cur = await db.execute("SELECT value FROM settings WHERE key = ?", (key,))

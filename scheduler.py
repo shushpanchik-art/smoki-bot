@@ -56,6 +56,7 @@ async def _publish_saga_episode():
     assert _bot is not None
     bot = _bot
     body, meta = await saga.generate_episode()
+    body = content._clean_html(body)  # полная очистка HTML (как у постов)
     state = await database.get_saga_state()
     reply_to = (state or {}).get("prev_message_id")
     last_id = None

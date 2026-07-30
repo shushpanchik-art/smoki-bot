@@ -105,7 +105,35 @@ def _clean_html(text: str) -> str:
     text = re.sub(r"(?<![\w_])_(?!\s)(.+?)(?<!\s)_(?![\w_])",
                   r"<i>\1</i>", text, flags=re.S)
     text = re.sub(r"\n{3,}", "\n\n", text)
+    text = _escape_unknown_tags(text)
     return text.strip()
+
+
+# Telegram поддерживает только этот набор HTML-тегов.
+_TG_ALLOWED = {"b", "strong", "i", "em", "u", "ins", "s", "strike", "del",
+               "a", "code", "pre", "span", "tg-spoiler", "blockquote"}
+
+
+def _escape_unknown_tags(text: str) -> str:
+    """Экранирует любые угловые скобки, кроме разрешённых Telegram тегов.
+
+    Всё, что не входит в белый список (например <сводка>, <b123abc>),
+    превращается в &lt;...&gt;, чтобы Telegram не падал на parse entities.
+    """
+    # Валидный тег: <tag>, <tag ...>, </tag>, <tag/> с латинским именем,
+    # завершающимся пробелом, / или >. Имя обязано быть в белом списке.
+    valid = re.compile(
+        r"</?([a-zA-Z][a-zA-Z0-9-]*)(?:[\s/][^<>]*)?>$")
+
+    def repl(m: "re.Match[str]") -> str:
+        frag = m.group(0)
+        vm = valid.match(frag)
+        if vm and vm.group(1).lower() in _TG_ALLOWED:
+            return frag
+        return frag.replace("<", "&lt;").replace(">", "&gt;")
+
+    # Ловим ЛЮБУЮ конструкцию <...> и решаем в repl.
+    return re.sub(r"<[^<>]*>", repl, text)
 
 
 async def _accumulated_rules(extra: str | None = None) -> str | None:

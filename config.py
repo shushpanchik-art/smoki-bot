@@ -31,6 +31,10 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_TEXT_MODEL = os.getenv("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
 GEMINI_IMAGE_MODEL = os.getenv("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
 GEMINI_API_KEY_FALLBACK = os.getenv("GEMINI_API_KEY_FALLBACK", "")
+# Резервные модели для AI Studio (express-ключ AQ.*): у Vertex и AI Studio
+# разные имена, gemini-2.5-flash в AI Studio отдаёт 404 для новых юзеров.
+GEMINI_TEXT_MODEL_FALLBACK = os.getenv("GEMINI_TEXT_MODEL_FALLBACK", "gemini-flash-latest")
+GEMINI_IMAGE_MODEL_FALLBACK = os.getenv("GEMINI_IMAGE_MODEL_FALLBACK", "gemini-2.5-flash-image")
 
 # --- Vertex AI (аутентификация через service account, без API-ключа) ---
 GOOGLE_GENAI_USE_VERTEXAI = os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "false")

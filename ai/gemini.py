@@ -38,7 +38,7 @@ def get_fallback_client() -> genai.Client | None:
     if not config.GEMINI_API_KEY_FALLBACK:
         return None
     if _fallback is None:
-        _fallback = genai.Client(api_key=config.GEMINI_API_KEY_FALLBACK)
+        _fallback = genai.Client(vertexai=False, api_key=config.GEMINI_API_KEY_FALLBACK)
         logger.info("GenAI fallback client создан (AI Studio)")
     return _fallback
 
@@ -85,6 +85,14 @@ def _clients() -> list[tuple[str, genai.Client]]:
     return out
 
 
+def _text_model(name: str) -> str:
+    return config.GEMINI_TEXT_MODEL_FALLBACK if name == "fallback" else config.GEMINI_TEXT_MODEL
+
+
+def _image_model(name: str) -> str:
+    return config.GEMINI_IMAGE_MODEL_FALLBACK if name == "fallback" else config.GEMINI_IMAGE_MODEL
+
+
 def generate_text(prompt: str, *, temperature: float = 0.9,
                   max_output_tokens: int = 8192,
                   use_search: bool = False) -> str:
@@ -102,7 +110,7 @@ def generate_text(prompt: str, *, temperature: float = 0.9,
         try:
             resp = _call_with_retry(
                 lambda c=client: c.models.generate_content(
-                    model=config.GEMINI_TEXT_MODEL,
+                    model=_text_model(name),
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         temperature=temperature,
@@ -190,7 +198,7 @@ def generate_image(prompt: str) -> bytes | None:
         try:
             resp = _call_with_retry(
                 lambda c=client: c.models.generate_content(
-                    model=config.GEMINI_IMAGE_MODEL,
+                    model=_image_model(name),
                     contents=prompt,
                 ),
                 f"generate_image[{name}]",

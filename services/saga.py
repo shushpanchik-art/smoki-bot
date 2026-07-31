@@ -55,7 +55,16 @@ async def generate_episode() -> tuple[str, dict]:
     force = _should_force_finale(state)
 
     prompt = prompts.saga_prompt(state, summaries, force_finale=force)
-    raw = await _text(prompt, temperature=0.95, max_output_tokens=4096)
+    raw = await _text(prompt, temperature=0.95, max_output_tokens=8192)
+
+    # Нормальный ответ ВСЕГДА содержит блок META. Его отсутствие = обрыв
+    # генерации (MAX_TOKENS) до меты. Не публикуем огрызок и не двигаем
+    # состояние саги вслепую — падаем, scheduler уйдёт на фолбэк.
+    if META_MARK not in raw:
+        raise RuntimeError(
+            f"saga: ответ оборван без блока META (len={len(raw)}), "
+            "эпизод не сгенерирован полностью"
+        )
 
     body, meta = _split_meta(raw)
     await _apply_meta(state, meta, body)
@@ -173,3 +182,12 @@ async def _apply_meta(state: dict | None, meta: dict, body: str) -> None:
 async def set_prev_message_id(message_id: int) -> None:
     """Publisher вызывает после отправки — для reply-цепочки эпизодов."""
     await db.upsert_saga_state(prev_message_id=message_id)
+
+
+async def set_prev_ids(last_id: int, first_id: int) -> None:
+    """Сохраняет id последнего (для reply-цепочки) и первого (для
+    ссылки-стрелки с предыдущего эпизода) сообщений эпизода."""
+    await db.upsert_saga_state(
+        prev_message_id=last_id,
+        prev_first_message_id=first_id,
+    )

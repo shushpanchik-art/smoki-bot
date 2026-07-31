@@ -1,5 +1,5 @@
 from aiogram import Router, F
-from aiogram.types import Message
+from aiogram.types import CallbackQuery, Message
 
 import config
 from db import database
@@ -9,6 +9,15 @@ router = Router(name="group")
 # Служебный аккаунт Telegram, от имени которого приходят автопересылки
 # постов канала в привязанную группу-обсуждение.
 TELEGRAM_SERVICE_USER_ID = 777000
+
+
+@router.callback_query(F.data == "saga:soon")
+async def saga_soon(cb: CallbackQuery) -> None:
+    """Кнопка «Продолжение следует…» — эпизод ещё пишется."""
+    await cb.answer(
+        "Продолжение ещё пишется — загляни в следующий эпизод саги.",
+        show_alert=True,
+    )
 
 
 @router.message(F.chat.type.in_({"group", "supergroup"}))

@@ -197,6 +197,7 @@ async def _migrate_saga(db) -> None:
         "pending_arc_seed": "TEXT",
         "arc_status": "TEXT DEFAULT 'in_progress'",
         "arc_synopsis_json": "TEXT DEFAULT '[]'",
+        "prev_first_message_id": "INTEGER",
     }
     for name, decl in add.items():
         if name not in cols:

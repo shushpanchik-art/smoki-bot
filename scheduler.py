@@ -7,6 +7,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from aiogram import Bot
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 import config
 from db import database
@@ -51,28 +52,78 @@ async def _job_morning():
     await _generate_and_moderate(prompts.facts_rules(n), "утро")
 
 
+def _channel_link(message_id: int) -> str:
+    """Ссылка на сообщение канала для кнопки-стрелки."""
+    chan = str(config.CHANNEL_ID).lstrip("@")
+    return f"https://t.me/{chan}/{message_id}"
+
+
 async def _publish_saga_episode():
-    """Публикует один эпизод саги сразу в канал reply-цепочкой (без модерации)."""
+    """Публикует один эпизод саги сразу в канал reply-цепочкой (без модерации).
+
+    Добавляет: хедер (круг/эпизод), кнопку «Продолжение следует…» на
+    последней части и правит кнопку предыдущего эпизода на ссылку-стрелку.
+    """
     assert _bot is not None
     bot = _bot
     body, meta = await saga.generate_episode()
     body = content._clean_html(body)  # полная очистка HTML (как у постов)
-    state = await database.get_saga_state()
-    reply_to = (state or {}).get("prev_message_id")
+
+    # свежий state — в нём уже обновлённые arc_number/episode_in_arc
+    state = await database.get_saga_state() or {}
+    old_last_id = state.get("prev_message_id")
+    arc = int(state.get("arc_number") or 1)
+    ep = int(state.get("episode_in_arc") or 0) + 1  # людям с 1
+    header = (
+        "\U0001F5FC <b>Падение Вавилонской башни</b>\n"
+        f"Круг {arc}, эпизод {ep}\n\n"
+    )
+    full = header + body
+
+    parts = [p for p in publisher._split(full, publisher.TG_TEXT_LIMIT)
+             if p.strip()]
+    soon_kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text="\u23F3 Продолжение следует…",
+            callback_data="saga:soon"),
+    ]])
+
+    reply_to = old_last_id
+    first_id = None
     last_id = None
-    for part in publisher._split(body, publisher.TG_TEXT_LIMIT):
-        if not part.strip():
-            continue
+    for i, part in enumerate(parts):
+        is_last = (i == len(parts) - 1)
         msg = await bot.send_message(
             config.CHANNEL_ID, part, parse_mode="HTML",
             reply_to_message_id=reply_to,
+            reply_markup=soon_kb if is_last else None,
         )
+        if first_id is None:
+            first_id = msg.message_id
         reply_to = msg.message_id
         last_id = msg.message_id
-    if last_id is not None:
-        await saga.set_prev_message_id(last_id)
-    logger.info("Сага: эпизод опубликован arc=%s status=%s",
-                meta.get("arc_number"), meta.get("arc_status"))
+
+    # заменить кнопку предыдущего эпизода на ссылку-стрелку сюда
+    if old_last_id and first_id:
+        arrow_kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(
+                text="Продолжение \u2500\u2500\u25BA",
+                url=_channel_link(first_id)),
+        ]])
+        try:
+            await bot.edit_message_reply_markup(
+                chat_id=config.CHANNEL_ID,
+                message_id=old_last_id,
+                reply_markup=arrow_kb,
+            )
+        except Exception:
+            logger.warning("Сага: не удалось обновить кнопку прошлого эпизода",
+                           exc_info=True)
+
+    if last_id is not None and first_id is not None:
+        await saga.set_prev_ids(last_id, first_id)
+    logger.info("Сага: эпизод опубликован arc=%s ep=%s status=%s",
+                arc, ep, meta.get("arc_status"))
 
 
 async def _job_evening():

@@ -122,6 +122,17 @@ def generate_text(prompt: str, *, temperature: float = 0.9,
             )
             if name == "fallback":
                 logger.warning("generate_text: использован резервный ключ")
+            try:
+                cands = getattr(resp, "candidates", None) or []
+                fr = getattr(cands[0], "finish_reason", None) if cands else None
+                if fr == types.FinishReason.MAX_TOKENS:
+                    logger.warning(
+                        "generate_text[%s]: ответ ОБОРВАН по MAX_TOKENS "
+                        "(max_output_tokens=%d) — текст неполный",
+                        name, max_output_tokens,
+                    )
+            except Exception:  # noqa: BLE001
+                logger.debug("generate_text: не удалось прочитать finish_reason")
             return (resp.text or "").strip()
         except Exception as e:  # noqa: BLE001
             last_err = e

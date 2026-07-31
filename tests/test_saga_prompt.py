@@ -76,3 +76,27 @@ def test_no_from_nowhere_rule():
 def test_word_range():
     p = saga_prompt(None)
     assert "600-1000" in p
+
+
+def test_quotes_rule():
+    """Баг 6: правило про русские ёлочки в кавычках."""
+    p = saga_prompt(None)
+    assert "\u00ab...\u00bb" in p  # «...»
+    assert "\u0451лочк" in p.lower() or "\u0435лочк" in p.lower()
+    assert "12. \u041a\u0410\u0412\u042b\u0427\u041a\u0418" in p
+
+
+def test_no_italic_brands_rule():
+    """Баг 7: запрет курсива на брендах/марках."""
+    p = saga_prompt(None)
+    assert "13. \u041a\u0423\u0420\u0421\u0418\u0412" in p
+    assert "iPhone" in p and "Porsche" in p
+    assert "VapeCorp" in p and "\u0410\u043b\u044c\u0444\u0430" in p
+    low = p.lower()
+    assert "\u043d\u0438\u043a\u043e\u0433\u0434\u0430 \u043d\u0435 \u0432\u044b\u0434\u0435\u043b\u044f\u0439 \u043a\u0443\u0440\u0441\u0438\u0432\u043e\u043c" in low
+
+
+def test_link_to_previous_rule():
+    """Баг 2: первый абзац продолжает прошлый эпизод."""
+    p = saga_prompt(None)
+    assert "14. \u0421\u0412\u042f\u0417\u042c \u0421 \u041f\u0420\u0415\u0414\u042b\u0414\u0423\u0429\u0418\u041c" in p

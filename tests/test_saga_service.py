@@ -4,6 +4,8 @@
 первая арка, продолжение, переход арок (seed -> goal), парсинг META.
 """
 import json
+import re
+from pathlib import Path
 
 import pytest
 
@@ -169,3 +171,49 @@ async def test_set_prev_message_id(tmp_db):
     await saga.set_prev_message_id(4242)
     st = await db.get_saga_state()
     assert st["prev_message_id"] == 4242
+
+
+# ----------------------- баг 3: номер эпизода в хедере без двойного +1
+@pytest.mark.asyncio
+async def test_episode_header_number_no_double_shift(tmp_db):
+    """После _apply_meta scheduler берёт ep = episode_in_arc (без +1).
+
+    Раньше scheduler делал episode_in_arc + 1, а _apply_meta уже
+    инкрементил счётчик — 1-й эпизод показывался как «эпизод 2».
+    """
+    from db import database as db
+    await db.init_db()
+
+    # первый эпизод
+    await saga._apply_meta(None, {"summary": "s1", "arc_goal": "g",
+                                  "arc_status": "in_progress"}, "тело")
+    st = await db.get_saga_state()
+    ep = int(st.get("episode_in_arc") or 1)  # формула scheduler
+    assert ep == 1, f"1-й эпизод должен быть №1, а не {ep}"
+
+    # второй эпизод
+    await saga._apply_meta(st, {"summary": "s2",
+                                "arc_status": "in_progress"}, "тело")
+    st2 = await db.get_saga_state()
+    ep2 = int(st2.get("episode_in_arc") or 1)
+    assert ep2 == 2, f"2-й эпизод должен быть №2, а не {ep2}"
+
+
+# диапазоны эмодзи: символьные пикто, доп.символы, дингбаты, VS-16
+_EMOJI = re.compile(
+    "[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0000FE0F\U00002190-\U000021FF]"
+)
+
+
+def test_scheduler_header_no_emoji_and_no_double_ep():
+    """Баг 5: в блоке header нет НИ ОДНОГО эмодзи; баг 3: ep без +1."""
+    src = Path("scheduler.py").read_text(encoding="utf-8")
+    # вырезаем только блок header = ( ... )
+    m = re.search(r"header = \((.*?)\)", src, re.DOTALL)
+    assert m, "блок header не найден в scheduler.py"
+    header_block = m.group(1)
+    found = _EMOJI.findall(header_block)
+    assert not found, f"эмодзи в хедере: {found!r}"
+    assert 'ep = int(state.get("episode_in_arc") or 0) + 1' not in src, \
+        "остался двойной +1"
+    assert 'ep = int(state.get("episode_in_arc") or 1)' in src

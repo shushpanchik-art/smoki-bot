@@ -66,6 +66,8 @@ async def _publish_saga_episode():
     """
     assert _bot is not None
     bot = _bot
+    # живучесть: чиним хвост, если посты в канале удалили руками
+    await saga.resolve_live_tail(bot)
     body, meta = await saga.generate_episode()
     body = content._clean_html(body)  # полная очистка HTML (как у постов)
 
@@ -73,9 +75,10 @@ async def _publish_saga_episode():
     state = await database.get_saga_state() or {}
     old_last_id = state.get("prev_message_id")
     arc = int(state.get("arc_number") or 1)
-    ep = int(state.get("episode_in_arc") or 0) + 1  # людям с 1
+    # episode_in_arc уже инкрементнут _apply_meta в generate_episode()
+    ep = int(state.get("episode_in_arc") or 1)
     header = (
-        "\U0001F5FC <b>Падение Вавилонской башни</b>\n"
+        "<b>Падение Вавилонской башни</b>\n"
         f"Круг {arc}, эпизод {ep}\n\n"
     )
     full = header + body
@@ -91,6 +94,7 @@ async def _publish_saga_episode():
     reply_to = old_last_id
     first_id = None
     last_id = None
+    msg_ids: list[int] = []
     for i, part in enumerate(parts):
         is_last = (i == len(parts) - 1)
         msg = await bot.send_message(
@@ -100,6 +104,7 @@ async def _publish_saga_episode():
         )
         if first_id is None:
             first_id = msg.message_id
+        msg_ids.append(msg.message_id)
         reply_to = msg.message_id
         last_id = msg.message_id
 
@@ -122,6 +127,8 @@ async def _publish_saga_episode():
 
     if last_id is not None and first_id is not None:
         await saga.set_prev_ids(last_id, first_id)
+        # журнал эпизода — для контроля живучести в след. раз
+        await database.add_saga_posts(arc, ep, msg_ids)
     logger.info("Сага: эпизод опубликован arc=%s ep=%s status=%s",
                 arc, ep, meta.get("arc_status"))
 

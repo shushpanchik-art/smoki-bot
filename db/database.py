@@ -204,6 +204,20 @@ async def _migrate_saga(db) -> None:
             await db.execute(
                 f"ALTER TABLE saga_state ADD COLUMN {name} {decl}")
     await db.commit()
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS saga_posts (
+          id INTEGER PRIMARY KEY,
+          arc_number INTEGER NOT NULL,
+          episode_in_arc INTEGER NOT NULL,
+          part_index INTEGER NOT NULL,
+          message_id INTEGER NOT NULL,
+          is_first INTEGER DEFAULT 0,
+          is_last INTEGER DEFAULT 0,
+          deleted INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    await db.commit()
 
 
 async def get_saga_state() -> dict | None:
@@ -257,6 +271,70 @@ async def get_saga_summaries() -> list[dict]:
             "SELECT * FROM saga_summaries ORDER BY episode_number ASC")
         rows = await cur.fetchall()
         return [dict(r) for r in rows]
+
+
+async def add_saga_posts(arc_number: int, episode_in_arc: int,
+                         message_ids: list[int]) -> None:
+    """Журналирует все части опубликованного эпизода саги."""
+    if not message_ids:
+        return
+    n = len(message_ids)
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        for idx, mid in enumerate(message_ids):
+            await db.execute(
+                "INSERT INTO saga_posts (arc_number, episode_in_arc, "
+                "part_index, message_id, is_first, is_last) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (arc_number, episode_in_arc, idx, mid,
+                 1 if idx == 0 else 0, 1 if idx == n - 1 else 0),
+            )
+        await db.commit()
+
+
+async def get_saga_posts(include_deleted: bool = False) -> list[dict]:
+    """Весь журнал постов саги по порядку (arc, episode, part)."""
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        q = "SELECT * FROM saga_posts"
+        if not include_deleted:
+            q += " WHERE deleted = 0"
+        q += " ORDER BY arc_number ASC, episode_in_arc ASC, part_index ASC"
+        cur = await db.execute(q)
+        rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def get_saga_episodes() -> list[dict]:
+    """Живые эпизоды журнала: по одной записи на эпизод с first/last msg_id."""
+    posts = await get_saga_posts(include_deleted=False)
+    by_ep: dict[tuple[int, int], dict] = {}
+    for row in posts:
+        key = (row["arc_number"], row["episode_in_arc"])
+        ep = by_ep.setdefault(key, {
+            "arc_number": row["arc_number"],
+            "episode_in_arc": row["episode_in_arc"],
+            "first_message_id": None,
+            "last_message_id": None,
+            "parts": 0,
+        })
+        ep["parts"] += 1
+        if row["is_first"]:
+            ep["first_message_id"] = row["message_id"]
+        if row["is_last"]:
+            ep["last_message_id"] = row["message_id"]
+    return [by_ep[k] for k in sorted(by_ep)]
+
+
+async def mark_saga_episode_deleted(arc_number: int,
+                                    episode_in_arc: int) -> None:
+    """Помечает все части эпизода как удалённые (фантом/пропал из канала)."""
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        await db.execute(
+            "UPDATE saga_posts SET deleted = 1 "
+            "WHERE arc_number = ? AND episode_in_arc = ?",
+            (arc_number, episode_in_arc),
+        )
+        await db.commit()
 
 
 async def get_setting(key: str, default: str | None = None) -> str | None:

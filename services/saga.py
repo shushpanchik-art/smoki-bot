@@ -10,6 +10,10 @@ import json
 import logging
 import re
 
+from aiogram import Bot
+from aiogram.exceptions import TelegramBadRequest
+
+import config
 from ai import gemini, prompts
 from db import database as db
 
@@ -191,3 +195,82 @@ async def set_prev_ids(last_id: int, first_id: int) -> None:
         prev_message_id=last_id,
         prev_first_message_id=first_id,
     )
+
+
+# ------------------------------------------------- контроль живучести постов
+
+async def _ping_alive(bot: Bot, message_id: int) -> bool:
+    """True если пост существует в канале. Косвенно, через попытку правки
+    reply-markup. Bot API не умеет читать текст, но 'not found' надёжно
+    отличает удалённый пост от живого."""
+    try:
+        await bot.edit_message_reply_markup(
+            chat_id=config.CHANNEL_ID,
+            message_id=message_id,
+            reply_markup=None,
+        )
+        return True
+    except TelegramBadRequest as e:
+        text = str(e).lower()
+        # тот же markup / нечего менять -> пост ЖИВ
+        if "message is not modified" in text or "reply markup" in text:
+            return True
+        if "not found" in text or "message to edit" in text:
+            return False
+        # прочие ошибки трактуем как 'жив', чтобы не потерять историю зря
+        logger.warning("saga ping: непонятная ошибка msg=%s: %s",
+                       message_id, e)
+        return True
+    except Exception as e:  # noqa: BLE001
+        logger.warning("saga ping: сбой msg=%s: %s", message_id, e)
+        return True
+
+
+async def resolve_live_tail(bot: Bot) -> dict | None:
+    """Перед генерацией: находит реальный живой хвост саги.
+
+    Идёт по журналу эпизодов с конца, пингует last_message_id каждого.
+    Мёртвые (удалённые из канала) помечает deleted и откатывает saga_state
+    на первый найденный живой эпизод. Возвращает живой эпизод или None
+    (журнал пуст / все посты удалены → сага начнётся заново).
+    """
+    episodes = await db.get_saga_episodes()
+    if not episodes:
+        logger.info("saga tail: журнал пуст — старт с нуля")
+        return None
+
+    live = None
+    for ep in reversed(episodes):
+        mid = ep.get("last_message_id") or ep.get("first_message_id")
+        if mid and await _ping_alive(bot, mid):
+            live = ep
+            break
+        logger.warning(
+            "saga tail: эпизод arc=%s ep=%s (msg=%s) мёртв — помечаю deleted",
+            ep["arc_number"], ep["episode_in_arc"], mid,
+        )
+        await db.mark_saga_episode_deleted(
+            ep["arc_number"], ep["episode_in_arc"])
+
+    if live is None:
+        logger.warning("saga tail: все посты удалены — сага стартует заново")
+        await db.upsert_saga_state(
+            prev_message_id=None,
+            prev_first_message_id=None,
+        )
+        return None
+
+    # откат счётчиков state на живой хвост
+    await db.upsert_saga_state(
+        arc_number=live["arc_number"],
+        episode_in_arc=live["episode_in_arc"],
+        prev_message_id=live["last_message_id"],
+        prev_first_message_id=live["first_message_id"],
+    )
+    logger.info(
+        "saga tail: живой хвост arc=%s ep=%s last=%s first=%s",
+        live["arc_number"], live["episode_in_arc"],
+        live["last_message_id"], live["first_message_id"],
+    )
+    return live
+

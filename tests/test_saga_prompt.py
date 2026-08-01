@@ -75,7 +75,7 @@ def test_no_from_nowhere_rule():
 
 def test_word_range():
     p = saga_prompt(None)
-    assert "600-1000" in p
+    assert "700-1000" in p
 
 
 def test_quotes_rule():
@@ -93,7 +93,7 @@ def test_no_italic_brands_rule():
     assert "iPhone" in p and "Porsche" in p
     assert "VapeCorp" in p and "\u0410\u043b\u044c\u0444\u0430" in p
     low = p.lower()
-    assert "\u043d\u0438\u043a\u043e\u0433\u0434\u0430 \u043d\u0435 \u0432\u044b\u0434\u0435\u043b\u044f\u0439 \u043a\u0443\u0440\u0441\u0438\u0432\u043e\u043c" in low
+    assert "\u0437\u0430\u043f\u0440\u0435\u0449\u0435\u043d\u043e \u0432\u044b\u0434\u0435\u043b\u044f\u0442\u044c \u043a\u0443\u0440\u0441\u0438\u0432\u043e\u043c" in low
 
 
 def test_link_to_previous_rule():

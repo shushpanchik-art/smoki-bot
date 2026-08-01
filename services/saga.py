@@ -48,10 +48,12 @@ def _should_force_finale(state: dict | None) -> bool:
     return in_arc >= planned - 1 or in_arc >= FORCE_FINALE_AT
 
 
-async def generate_episode() -> tuple[str, dict]:
+async def generate_episode(dry_run: bool = False) -> tuple[str, dict]:
     """Генерирует один эпизод.
 
-    Возвращает (body_text, meta_dict). meta уже применён к БД.
+    Возвращает (body_text, meta_dict).
+    При dry_run=True состояние саги НЕ трогается (тестовый прогон):
+    _apply_meta не вызывается, счётчики эпизодов не растут.
     body_text — чистый текст эпизода (без блока META), готов к публикации.
     """
     state = await db.get_saga_state()
@@ -71,7 +73,10 @@ async def generate_episode() -> tuple[str, dict]:
         )
 
     body, meta = _split_meta(raw)
-    await _apply_meta(state, meta, body)
+    if not dry_run:
+        await _apply_meta(state, meta, body)
+    else:
+        logger.info("saga DRY-RUN: состояние НЕ изменено")
     logger.info("saga episode готов: arc=%s ep_in_arc=%s status=%s len=%d",
                 meta.get("arc_number"), meta.get("episode_in_arc"),
                 meta.get("arc_status"), len(body))
@@ -137,6 +142,11 @@ async def _apply_meta(state: dict | None, meta: dict, body: str) -> None:
         fields["harmon_stage"] = meta["harmon_stage"]
     if summary:
         fields["last_summary"] = summary
+    # хвост тела эпизода (последние ~800 симв) — чтобы следующий эпизод
+    # дословно продолжал события/клиффхэнгер, а не начинал несвязную линию
+    tail = (body or "").strip()
+    if tail:
+        fields["last_tail"] = tail[-800:]
 
     status = (meta.get("arc_status") or "in_progress").strip()
 

@@ -12,6 +12,7 @@ images/
 htmlcov/
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
 media/
 *.session
 *.session-journal

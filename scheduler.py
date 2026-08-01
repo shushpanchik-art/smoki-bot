@@ -58,17 +58,21 @@ def _channel_link(message_id: int) -> str:
     return f"https://t.me/{chan}/{message_id}"
 
 
-async def _publish_saga_episode():
+async def _publish_saga_episode(dry_run: bool = False):
     """Публикует один эпизод саги сразу в канал reply-цепочкой (без модерации).
 
     Добавляет: хедер (круг/эпизод), кнопку «Продолжение следует…» на
     последней части и правит кнопку предыдущего эпизода на ссылку-стрелку.
+    При dry_run=True: НИЧЕГО не публикует и не пишет в БД — только печатает
+    сгенерированный текст в stdout (тестовый прогон, счётчики не растут).
     """
     assert _bot is not None
     bot = _bot
     # живучесть: чиним хвост, если посты в канале удалили руками
-    await saga.resolve_live_tail(bot)
-    body, meta = await saga.generate_episode()
+    # (в dry_run НЕ трогаем — resolve_live_tail откатывает saga_state)
+    if not dry_run:
+        await saga.resolve_live_tail(bot)
+    body, meta = await saga.generate_episode(dry_run=dry_run)
     body = content._clean_html(body)  # полная очистка HTML (как у постов)
 
     # свежий state — в нём уже обновлённые arc_number/episode_in_arc
@@ -79,9 +83,18 @@ async def _publish_saga_episode():
     ep = int(state.get("episode_in_arc") or 1)
     header = (
         "<b>Падение Вавилонской башни</b>\n"
-        f"Круг {arc}, эпизод {ep}\n\n"
+        f"круг {arc}, эпизод {ep}\n\n"
     )
     full = header + body
+
+    if dry_run:
+        print("\n" + "=" * 70)
+        print("DRY-RUN САГА (в канал НЕ отправлено, БД НЕ изменена)")
+        print("=" * 70)
+        print(full)
+        print("=" * 70)
+        print(f"arc_status={meta.get('arc_status')} arc={arc} ep={ep}")
+        return
 
     parts = [p for p in publisher._split(full, publisher.TG_TEXT_LIMIT)
              if p.strip()]

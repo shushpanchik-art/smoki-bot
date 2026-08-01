@@ -16,3 +16,8 @@ media/
 *.session
 *.session-journal
 run_saga_once.py
+
+# saga dry-run / snapshot tools (локальные, не коммитить)
+run_one_episode.py
+saga_snapshot.py
+saga_snapshot.json

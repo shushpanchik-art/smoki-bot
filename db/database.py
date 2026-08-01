@@ -194,6 +194,7 @@ async def _migrate_saga(db) -> None:
     cols = {row[1] for row in await cur.fetchall()}
     add = {
         "narration": "TEXT",
+        "last_tail": "TEXT",
         "pending_arc_seed": "TEXT",
         "arc_status": "TEXT DEFAULT 'in_progress'",
         "arc_synopsis_json": "TEXT DEFAULT '[]'",

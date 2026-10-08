@@ -43,17 +43,30 @@ read_credentials() {
 send_telegram() {
     local text="$1"
     local resp_file="/tmp/smoki_notify_resp.$$"
-    local http_code
-    http_code="$(curl -s -o "$resp_file" -w '%{http_code}' \
-        -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
-        -d chat_id="${ADMIN_ID}" \
-        -d parse_mode=Markdown \
-        --data-urlencode "text=${text}" || echo "000")"
+    local http_code="000" attempt=1
+    local max="${SEND_RETRIES:-3}" delay="${SEND_RETRY_DELAY:-5}"
+    while :; do
+        http_code="$(curl -s -o "$resp_file" -w '%{http_code}' \
+            --max-time 20 \
+            -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            -d chat_id="${ADMIN_ID}" \
+            -d parse_mode=Markdown \
+            --data-urlencode "text=${text}" || echo "000")"
+        # Повтор только при сетевом сбое (000), 429 и 5xx. 4xx не повторяем.
+        case "$http_code" in
+            000|429|5??) : ;;
+            *) break ;;
+        esac
+        if [ "$attempt" -ge "$max" ]; then break; fi
+        log "WARN: алерт '$EVENT' попытка ${attempt}/${max} не удалась (HTTP $http_code), повтор через ${delay}s"
+        sleep "$delay"
+        attempt=$((attempt + 1))
+    done
     if [ "$http_code" = "200" ]; then
-        log "OK: алерт '$EVENT' отправлен (HTTP 200)"; rm -f "$resp_file"; return 0
+        log "OK: алерт '$EVENT' отправлен (HTTP 200, попытка ${attempt})"; rm -f "$resp_file"; return 0
     else
         local body; body="$(cat "$resp_file" 2>/dev/null || echo '')"
-        log "ERROR: алерт '$EVENT' не отправлен (HTTP $http_code): $body"; rm -f "$resp_file"; return 5
+        log "ERROR: алерт '$EVENT' не отправлен (HTTP $http_code, попыток ${attempt}): $body"; rm -f "$resp_file"; return 5
     fi
 }
 

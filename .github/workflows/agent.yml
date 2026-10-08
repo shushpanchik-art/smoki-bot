@@ -18,8 +18,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.AGENT_TOKEN }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -29,7 +29,9 @@ jobs:
       - name: Install tools
         run: |
           pip install aider-chat
-          pip install ruff==0.15.12 mypy==1.14.1 pytest
+          # ЗАМЕНИТЕ строку ниже на установку из джобы Pytest в .github/workflows/ci.yml
+          # (тот же requirements-файл и та же версия pytest-asyncio)
+          pip install ruff==0.15.12 mypy==1.14.1 pytest pytest-asyncio
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Create branch and task file
@@ -54,6 +56,7 @@ jobs:
       - name: Local checks (как в CI)
         run: |
           ruff check . --exclude venv,data,__pycache__
+          # ЗАМЕНИТЕ на точную команду pytest из джобы Pytest в ci.yml
           python -m pytest -q
 
       - name: Push and open PR
@@ -65,7 +68,7 @@ jobs:
             echo "Изменений нет, PR не создаём"
             exit 0
           fi
-          git push -u origin "agent/issue-$ISSUE_NUM"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "agent/issue-$ISSUE_NUM"
           gh pr create \
             --base main \
             --head "agent/issue-$ISSUE_NUM" \

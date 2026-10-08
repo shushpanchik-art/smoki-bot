@@ -1,0 +1,80 @@
+name: ai-agent
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  run:
+    # Запуск только по метке ai-task и только от владельца репозитория
+    if: github.event.label.name == 'ai-task' && github.event.sender.login == 'shushpanchik-art'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ISSUE_NUM: ${{ github.event.issue.number }}
+      ISSUE_TITLE: ${{ github.event.issue.title }}
+      ISSUE_BODY: ${{ github.event.issue.body }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.AGENT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install tools
+        run: |
+          pip install aider-chat
+          pip install ruff==0.15.12 mypy==1.14.1 pytest
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Create branch and task file
+        run: |
+          git config user.name "ai-agent"
+          git config user.email "ai-agent@users.noreply.github.com"
+          git checkout -b "agent/issue-$ISSUE_NUM"
+          printf '%s\n\n%s\n' "$ISSUE_TITLE" "$ISSUE_BODY" > task.txt
+
+      - name: Run agent (Gemini)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          aider \
+            --model gemini/gemini-3.1-pro-preview \
+            --yes-always \
+            --no-suggest-shell-commands \
+            --no-check-update \
+            --read SPEC.md \
+            --message-file task.txt
+
+      - name: Local checks (как в CI)
+        run: |
+          ruff check . --exclude venv,data,__pycache__
+          python -m pytest -q
+
+      - name: Push and open PR
+        env:
+          GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
+        run: |
+          git fetch origin main
+          if git diff --quiet origin/main HEAD; then
+            echo "Изменений нет, PR не создаём"
+            exit 0
+          fi
+          git push -u origin "agent/issue-$ISSUE_NUM"
+          gh pr create \
+            --base main \
+            --head "agent/issue-$ISSUE_NUM" \
+            --title "AI: $ISSUE_TITLE" \
+            --body "Closes #$ISSUE_NUM. Сгенерировано агентом, проверьте diff перед merge."
+
+      - name: Report failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
+        run: |
+          gh issue comment "$ISSUE_NUM" --body "Агент не смог завершить задачу или проверки не прошли. Смотрите логи в Actions."

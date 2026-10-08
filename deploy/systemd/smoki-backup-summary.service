@@ -6,6 +6,8 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+User=shushpanchik_art
+Group=shushpanchik_art
 Environment=BOT_DIR=/opt/SMOKI/bot
 ExecStart=/opt/SMOKI/bot/scripts/notify_admin.sh daily-summary
 

@@ -48,7 +48,7 @@ jobs:
             --yes-always \
             --no-suggest-shell-commands \
             --no-check-update \
-            --read SPEC.md \
+            --read docs/SPEC.md \
             --message-file task.txt
 
       - name: Local checks (как в CI)

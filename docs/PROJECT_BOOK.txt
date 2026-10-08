@@ -182,10 +182,10 @@ SMOKI-bot — это Telegram-бот, который САМ ведёт кана�
   COMMENTS_INTERVAL_HOURS    — как часто проверять комментарии (часы).
   MAX_REGEN                  — сколько раз можно перегенерировать один пост.
 
-  GEN_WINDOW_START / END     — окно генерации (часы), легаси.
+  GEN_WINDOW_START / END     — окно генерации (часы), по умолчанию 6 и 7.
   PUBLISH_WINDOW_START / END — окно публикации; END = час дедлайн-автопубликации.
-  MORNING_START / END        — окно утреннего поста (8-10).
-  EVENING_START / END        — окно вечернего поста (19-20).
+  MORNING_START / END        — окно утреннего поста (по умолчанию 8 и 10).
+  EVENING_START / END        — окно вечернего поста (по умолчанию 19 и 20).
   EVENING_DEADLINE_HOUR      — час вечернего дедлайна автопубликации (20).
   EVENING_DEADLINE_MINUTE    — минута вечернего дедлайна (30 => 20:30).
   MORNING_LEN_DEFAULT        — фактов в утреннем посте по умолчанию (3).
@@ -200,7 +200,10 @@ SMOKI-bot — это Telegram-бот, который САМ ведёт кана�
   MONTHLY_BUDGET_USD         — месячный бюджет AI для прогноза в статистике.
   PRICE_TEXT_IN/OUT_USD_PER_1M, PRICE_IMAGE_USD — прайс для расчёта расхода AI.
   BILLING_DATASET, BILLING_TABLE_PREFIX, CLOUD_PROJECT — экспорт биллинга BigQuery (U9b).
-  STORY_*                    — веса тем, лимиты в день и таймаут approve для Stories (U6).
+  STORY_*                    — веса тем, лимиты в день и таймаут approve для Stories (U6);
+                               STORY_MAX_REGEN — число перегенераций (по умолчанию 3).
+  TG_SESSION_PATH            — файл сессии userbot (по умолчанию /opt/SMOKI/bot/userbot.session).
+  GEMINI_TEXT_MODEL_FALLBACK / GEMINI_IMAGE_MODEL_FALLBACK — резервные модели Gemini.
   TG_API_ID, TG_API_HASH, TG_USERBOT_PHONE — для userbot (U6.5b, пока не заполнены).
   SEND_RETRIES, SEND_RETRY_DELAY — НЕ из config.py: читаются shell-скриптом
                                scripts/notify_admin.sh (повтор алертов при сбое сети).

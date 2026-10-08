@@ -41,6 +41,7 @@ read_credentials() {
 }
 
 send_telegram() {
+    TG_ATTEMPTED=1
     local text="$1"
     local resp_file="/tmp/smoki_notify_resp.$$"
     local http_code="000" attempt=1
@@ -51,7 +52,8 @@ send_telegram() {
             -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
             -d chat_id="${ADMIN_ID}" \
             -d parse_mode=Markdown \
-            --data-urlencode "text=${text}" || echo "000")"
+            --data-urlencode "text=${text}" || true)"
+        http_code="${http_code:-000}"
         # Повтор только при сетевом сбое (000), 429 и 5xx. 4xx не повторяем.
         case "$http_code" in
             000|429|5??) : ;;
@@ -80,7 +82,7 @@ ensure_backup_state_dir() {
 
 on_exit() {
     local rc=$?
-    if [ "$rc" -ne 0 ]; then
+    if [ "$rc" -ne 0 ] && [ -z "${TG_ATTEMPTED:-}" ]; then
         # Креды могли не загрузиться (падение до read_credentials): читаем .env сами, без exit
         local tok="${BOT_TOKEN:-}" adm="${ADMIN_ID:-}"
         if [ -z "$tok" ] || [ -z "$adm" ]; then

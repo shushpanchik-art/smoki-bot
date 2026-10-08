@@ -65,6 +65,27 @@ ensure_backup_state_dir() {
     fi
 }
 
+on_exit() {
+    local rc=$?
+    if [ "$rc" -ne 0 ]; then
+        # Креды могли не загрузиться (падение до read_credentials): читаем .env сами, без exit
+        local tok="${BOT_TOKEN:-}" adm="${ADMIN_ID:-}"
+        if [ -z "$tok" ] || [ -z "$adm" ]; then
+            if [ -r "$ENV_FILE" ]; then
+                tok="$(grep -E '^BOT_TOKEN=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")" || true
+                adm="$(grep -E '^ADMIN_CHAT_ID=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")" || true
+            fi
+        fi
+        if [ -n "$tok" ] && [ -n "$adm" ]; then
+            BOT_TOKEN="$tok"; ADMIN_ID="$adm"
+            send_telegram "❗ Скрипт бэкапов упал: событие ${EVENT:-пусто}, код ${rc}" || true
+        else
+            log "ON_EXIT: креды недоступны, алерт не отправлен (код ${rc})"
+        fi
+    fi
+}
+trap on_exit EXIT
+
 case "$EVENT" in
     backup-failed)
         ensure_backup_state_dir
@@ -216,7 +237,7 @@ case "$EVENT" in
         }
 
         # 1) Локальный smoki.db — свежайший файл за сегодня
-        LOCAL_FILE="$(find "$LOCAL_DB_DIR" -maxdepth 1 -name 'smoki_*.db' -type f -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 | awk '{print $2}')"
+        LOCAL_FILE="$(find "$LOCAL_DB_DIR" -maxdepth 1 -name 'smoki_*.db' -type f -printf '%T@ %p\n' 2>/dev/null | sort -nr | awk 'NR==1{print $2}')"
         if [ -n "$LOCAL_FILE" ] && [ "$(date -r "$LOCAL_FILE" '+%Y-%m-%d')" = "$TODAY" ]; then
             LSIZE="$(human_size "$(stat -c %s "$LOCAL_FILE")")"
             LTIME="$(date -r "$LOCAL_FILE" '+%H:%M %d.%m')"
@@ -228,7 +249,7 @@ case "$EVENT" in
         fi
 
         # 2) Offsite smoki.db — строка OK за сегодня
-        OFF_MATCH="$(grep -E "^\[$TODAY .*OK: offsite backup complete" "$OFFSITE_LOG" 2>/dev/null | tail -1)"
+        OFF_MATCH="$(grep -E "^\[$TODAY .*OK: offsite backup complete" "$OFFSITE_LOG" 2>/dev/null | tail -1 || true)"
         if [ -n "$OFF_MATCH" ]; then
             OTIME="$(echo "$OFF_MATCH" | sed -E 's/^\[[0-9-]+ ([0-9:]+).*/\1/')"
             OFF_LINE="✅ ok, ${OTIME} ${TODAY_HUMAN}"
@@ -239,7 +260,7 @@ case "$EVENT" in
         fi
 
         # 3) Full offsite — строка OK (N bytes) за сегодня
-        FULL_MATCH="$(grep -E "^\[$TODAY .*OK: full-offsite backup complete" "$FULL_LOG" 2>/dev/null | tail -1)"
+        FULL_MATCH="$(grep -E "^\[$TODAY .*OK: full-offsite backup complete" "$FULL_LOG" 2>/dev/null | tail -1 || true)"
         if [ -n "$FULL_MATCH" ]; then
             FTIME="$(echo "$FULL_MATCH" | sed -E 's/^\[[0-9-]+ ([0-9:]+).*/\1/')"
             FBYTES="$(echo "$FULL_MATCH" | sed -E 's/.*\(([0-9]+) bytes\).*/\1/')"

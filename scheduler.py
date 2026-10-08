@@ -39,8 +39,15 @@ async def _generate_and_moderate(length_hint: str, label: str):
             return
         await admin.send_for_moderation(bot, res["article_id"])
         logger.info("Статья #%s отправлена на модерацию", res["article_id"])
-    except Exception:
+    except Exception as e:
         logger.exception("Ошибка в плановой генерации")
+        try:
+            await bot.send_message(
+                config.ADMIN_CHAT_ID,
+                f"🔴 Плановая генерация УПАЛА ({label}): {type(e).__name__}: {e}",
+            )
+        except Exception:
+            logger.exception("Не смог уведомить админа")
 
 
 async def _job_morning():

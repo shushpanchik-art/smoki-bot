@@ -10,7 +10,7 @@ jobs:
     if: >-
       github.event.label.name == 'ai-task' &&
       github.event.sender.login == 'shushpanchik-art'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       ISSUE_NUM: ${{ github.event.issue.number }}
@@ -47,7 +47,7 @@ jobs:
               '- Не меняй схему БД (db/schema.sql) и миграции, если задача прямо этого не требует.' \
               '- Ценные проверки оформляй постоянными pytest-тестами в tests/ (фикстура tmp_db), а не разовыми скриптами.' \
               '- Перед завершением убедись, что ruff и mypy проходят на изменённых файлах.'
-          } > task.txt
+          } > "$RUNNER_TEMP/task.txt"
 
       - name: Run agent (Gemini)
         env:
@@ -56,10 +56,13 @@ jobs:
           aider \
             --model gemini/gemini-3.1-pro-preview \
             --yes-always \
+            --no-gitignore \
             --no-suggest-shell-commands \
             --no-check-update \
+            --chat-history-file "$RUNNER_TEMP/aider.chat.md" \
+            --input-history-file "$RUNNER_TEMP/aider.input" \
             --read docs/SPEC.md \
-            --message-file task.txt
+            --message-file "$RUNNER_TEMP/task.txt"
 
       - name: Guard protected paths
         run: |

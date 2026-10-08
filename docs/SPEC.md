@@ -9,7 +9,7 @@
 - Путь: /opt/SMOKI/bot, venv venv/bin/python
 - systemd: smoki-bot (Restart=always), режим polling
 - Python 3.11.2, aiogram 3.30.0, aiosqlite 0.22.1, apscheduler 3.11.3, SQLAlchemy 2.0.51 (persistent jobstore), python-dotenv 1.2.2, Pillow 12.3.0, telethon 1.44.0, google-genai 2.13.0, google-cloud-bigquery 3.27.0
-- БД smoki.db: published_topics, articles, comments, ai_logs, settings
+- БД smoki.db: published_topics, articles, comments, ai_logs, settings, story_jobs, saga_state, saga_summaries (схема в db/schema.sql), saga_posts (создаётся миграцией _migrate_saga в db/database.py)
 - Управление: systemctl restart smoki-bot; journalctl -u smoki-bot -n50
 
 ## AI
@@ -44,7 +44,8 @@
 
 ## Структура
 
-- bot.py, config.py, scheduler.py
+- bot.py, config.py, scheduler.py, userbot.py (отдельный процесс Telethon, Stories)
+- services: content, publisher, comments, stories, story_render, saga, schedule_view, schedule_control, billing
 - db (schema.sql, database.py)
 - ai (gemini.py, prompts.py)
 - services (content.py, publisher.py, comments.py)
@@ -173,6 +174,7 @@ Message|InaccessibleMessage. При /start отправляется ReplyKeyboar
 
 - **Формат картинки 4:5 (best practice)**: на мобильных постах Telegram картинка 4:5 (портрет) смотрится лучше квадрата/горизонта — занимает больше экрана, выше вовлечённость. Подтверждено тестом владельца на телефоне. Реализация — `ai/gemini._crop_landscape(ratio=4/5)` (дефолт), кроп квадрата 1024x1024 на нашей стороне (SDK не умеет `aspect_ratio`). НЕ откатывать к 3:2/квадрату. См. §U7.
 
+- **Повтор алертов** (`scripts/notify_admin.sh`, `send_telegram`): до `SEND_RETRIES` (деф. 3) попыток с паузой `SEND_RETRY_DELAY` (деф. 5 с). Повтор только при сетевом сбое (HTTP 000), 429 и 5xx; 4xx не повторяется. Введено в PR #183.
 - **Беспарольный рестарт**: настроен sudoers drop-in `/etc/sudoers.d/smoki-bot`
   (по образцу `smoktolk-bot`). Разрешены без пароля: `systemctl restart/start/stop/status smoki-bot`.
   Проверка синтаксиса перед активацией обязательна: `sudo visudo -c`.
@@ -355,6 +357,10 @@ P3 — nice-to-have. Разведка перед реализацией обяз
   начинает несвязную линию, а продолжает клиффхэнгер.
 - `saga_summaries` дают модели всю предысторию; `arc_synopsis_json` — итоги
   прошлых арк.
+
+### Запуск
+
+Отдельной джобы у саги нет. Внутри `scheduler._job_evening` (вечерний пост) эпизод саги выбирается с вероятностью `SAGA_RATIO / (1 + SAGA_RATIO)` (при 0.7 ≈ 41%), иначе идёт лонг-рид. Работает только при `SAGA_ENABLED=1`; в `.env.example` по умолчанию `SAGA_ENABLED=0`. Если сага упала, вечерний пост уходит фолбэком на лонг-рид.
 
 ### Публикация (`scheduler._publish_saga_episode`)
 
@@ -576,7 +582,7 @@ APScheduler (контент/сторис). Панель должна показ�
   Восстановление при старте: `apply_persisted_pauses()` из `bot.main`
   после `scheduler.start`. Белый список `PAUSABLE_JOBS` — сторожа
   `heartbeat`/`delivery_watchdog` не паузятся. Коммит `c6c24f9`.
-- **U8.2b** 🔄 — изменение часа утренней/вечерней публикации.
+- **U8.2b** ✅ — изменение часа утренней/вечерней публикации.
   `TIME_EDITABLE = {daily_morning: MORNING_START, daily_evening:
   EVENING_START}`. Override в `settings["time_<job>"]` (час 0-23).
   `effective_hour` = override → иначе config-дефолт. Экран `sched:times`,
@@ -599,7 +605,7 @@ U8.1/U8.2a/U8.2b/U8.2c — реализованы и смёржены в main, �
 
 ### Возможные будущие пункты U8
 
-- U8.3 — редактирование интервалов (`COMMENTS_INTERVAL_HOURS` и т.п.).
+- U8.3 — (бэклог, не реализовано) редактирование интервалов (`COMMENTS_INTERVAL_HOURS` и т.п.).
 - U8.4 — ручной «запустить сейчас» для контентной джобы (run_job).
 
 ## U9 — Оценка стоимости AI и прогноз бюджета [БЭКЛОГ, вернёмся позже]

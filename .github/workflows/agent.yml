@@ -18,12 +18,12 @@ jobs:
       ISSUE_BODY: ${{ github.event.issue.body }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
@@ -38,7 +38,16 @@ jobs:
           git config user.name "ai-agent"
           git config user.email "ai-agent@users.noreply.github.com"
           git checkout -b "agent/issue-$ISSUE_NUM"
-          printf '%s\n\n%s\n' "$ISSUE_TITLE" "$ISSUE_BODY" > task.txt
+          {
+            printf '%s\n\n%s\n\n' "$ISSUE_TITLE" "$ISSUE_BODY"
+            printf '%s\n' \
+              '---' \
+              'Правила проекта (docs/SPEC.md, обязательны):' \
+              '- Не меняй .github/, requirements*.txt и docs/SPEC.md.' \
+              '- Не меняй схему БД (db/schema.sql) и миграции, если задача прямо этого не требует.' \
+              '- Ценные проверки оформляй постоянными pytest-тестами в tests/ (фикстура tmp_db), а не разовыми скриптами.' \
+              '- Перед завершением убедись, что ruff и mypy проходят на изменённых файлах.'
+          } > task.txt
 
       - name: Run agent (Gemini)
         env:
@@ -52,9 +61,28 @@ jobs:
             --read docs/SPEC.md \
             --message-file task.txt
 
+      - name: Guard protected paths
+        run: |
+          git fetch origin main
+          if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+            echo "::error::Есть незакоммиченные изменения, PR не создаём"
+            git status --short
+            exit 1
+          fi
+          changed="$(git diff --name-only origin/main HEAD)"
+          if echo "$changed" | grep -E '^(\.github/|requirements[^/]*\.txt$|docs/SPEC\.md$|db/schema\.sql$)'; then
+            echo "::error::Агент изменил защищённые файлы, PR не создаём"
+            echo "$changed"
+            exit 1
+          fi
+
       - name: Local checks
         run: |
           ruff check . --exclude venv,data,__pycache__
+          changed_py="$(git diff --name-only origin/main HEAD -- '*.py')"
+          if [ -n "$changed_py" ]; then
+            python -m mypy $changed_py
+          fi
           python -m pytest -q
 
       - name: Push and open PR

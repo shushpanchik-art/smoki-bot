@@ -22,3 +22,7 @@ run_saga_once.py
 run_one_episode.py
 saga_snapshot.py
 saga_snapshot.json
+
+# Бэкапы .env и временные копии (не коммитить)
+.env.*
+!.env.example

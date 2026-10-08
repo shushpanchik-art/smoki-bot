@@ -1,0 +1,10 @@
+[Unit]
+Description=SMOKI: проверка свежести публикации, пинг healthchecks
+Documentation=file:/opt/SMOKI/bot/scripts/publish_freshness_check.sh
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=BOT_DIR=/opt/SMOKI/bot
+ExecStart=/bin/bash /opt/SMOKI/bot/scripts/publish_freshness_check.sh

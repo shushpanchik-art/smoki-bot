@@ -7,7 +7,9 @@ on:
 jobs:
   run:
     # Запуск только по метке ai-task и только от владельца репозитория
-    if: github.event.label.name == 'ai-task' && github.event.sender.login == 'shushpanchik-art'
+    if: >-
+      github.event.label.name == 'ai-task' &&
+      github.event.sender.login == 'shushpanchik-art'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -19,7 +21,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: false
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -29,10 +30,8 @@ jobs:
       - name: Install tools
         run: |
           pip install aider-chat
-          # ЗАМЕНИТЕ строку ниже на установку из джобы Pytest в .github/workflows/ci.yml
-          # (тот же requirements-файл и та же версия pytest-asyncio)
-          pip install ruff==0.15.12 mypy==1.14.1 pytest pytest-asyncio
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -r requirements.txt -r requirements-dev.txt
+          pip install ruff==0.15.12 mypy==1.14.1
 
       - name: Create branch and task file
         run: |
@@ -53,10 +52,9 @@ jobs:
             --read docs/SPEC.md \
             --message-file task.txt
 
-      - name: Local checks (как в CI)
+      - name: Local checks
         run: |
           ruff check . --exclude venv,data,__pycache__
-          # ЗАМЕНИТЕ на точную команду pytest из джобы Pytest в ci.yml
           python -m pytest -q
 
       - name: Push and open PR
@@ -69,11 +67,7 @@ jobs:
             exit 0
           fi
           git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "agent/issue-$ISSUE_NUM"
-          gh pr create \
-            --base main \
-            --head "agent/issue-$ISSUE_NUM" \
-            --title "AI: $ISSUE_TITLE" \
-            --body "Closes #$ISSUE_NUM. Сгенерировано агентом, проверьте diff перед merge."
+          gh pr create --base main --head "agent/issue-$ISSUE_NUM" --title "AI: $ISSUE_TITLE" --body "Closes #$ISSUE_NUM. Проверьте diff перед merge."
 
       - name: Report failure
         if: failure()

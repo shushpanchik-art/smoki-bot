@@ -166,6 +166,7 @@ SMOKI-bot — это Telegram-бот, который САМ ведёт кана�
   DISCUSSION_GROUP_ID        — id группы-обсуждения (куда падают комментарии).
   ADMIN_CHAT_ID              — id администратора (только он видит панель).
 
+  GEMINI_API_KEY             — ключ Gemini (основной); по умолчанию пустой.
   GEMINI_TEXT_MODEL          — модель для текста (gemini-2.5-flash).
   GEMINI_IMAGE_MODEL         — модель для картинок (gemini-2.5-flash-image).
   GEMINI_API_KEY_FALLBACK    — резервный ключ AI Studio (если Vertex упал).
@@ -183,6 +184,8 @@ SMOKI-bot — это Telegram-бот, который САМ ведёт кана�
   MAX_REGEN                  — сколько раз можно перегенерировать один пост.
 
   GEN_WINDOW_START / END     — окно генерации (часы), по умолчанию 6 и 7.
+  CATEGORIES                 — константа в config.py (не env): список категорий тем для ротации
+                               (news, curious, science, novelty, history, nonnicotine). Менять в коде.
   PUBLISH_WINDOW_START / END — окно публикации; END = час дедлайн-автопубликации.
   MORNING_START / END        — окно утреннего поста (по умолчанию 8 и 10).
   EVENING_START / END        — окно вечернего поста (по умолчанию 19 и 20).

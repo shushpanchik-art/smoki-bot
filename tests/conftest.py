@@ -26,3 +26,10 @@ def tmp_db(monkeypatch):
     yield path
     if os.path.exists(path):
         os.remove(path)
+
+
+@pytest.fixture(autouse=True)
+def _isolated_image_dir(monkeypatch, tmp_path):
+    """Картинки сторис пишем во временную папку, а не в /opt/SMOKI (нет на Mac)."""
+    from services import stories
+    monkeypatch.setattr(stories, "IMAGE_DIR", tmp_path / "images")

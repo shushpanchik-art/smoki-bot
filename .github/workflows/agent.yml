@@ -6,103 +6,147 @@ on:
 
 jobs:
   run:
-    # Запуск только по метке ai-task и только от владельца репозитория
-    if: >-
-      github.event.label.name == 'ai-task' &&
-      github.event.sender.login == 'shushpanchik-art'
-    runs-on: ubuntu-24.04
+    if: github.event.label.name == 'ai-task' && github.event.sender.login == 'shushpanchik-art'
+    runs-on: [self-hosted, smoki-agent]
     timeout-minutes: 30
     env:
       ISSUE_NUM: ${{ github.event.issue.number }}
       ISSUE_TITLE: ${{ github.event.issue.title }}
-      ISSUE_BODY: ${{ github.event.issue.body }}
+      TASK_TEXT: ${{ github.event.issue.body }}
+      RUN_BRANCH: agent/issue-${{ github.event.issue.number }}-${{ github.run_id }}
+      GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: "3.11"
-
       - name: Install tools
         run: |
-          pip install aider-chat
-          pip install -r requirements.txt -r requirements-dev.txt
-          pip install ruff==0.15.12 mypy==1.14.1
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install -q aider-chat
+          "$RUNNER_TEMP/venv/bin/pip" install -q -r requirements.txt -r requirements-dev.txt ruff==0.15.12 mypy==1.14.1
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
 
-      - name: Create branch and task file
+      - name: Server snapshot (read-only)
+        run: |
+          git config --global --add safe.directory /opt/SMOKI/bot
+          {
+            echo "## Git /opt/SMOKI/bot"
+            git -C /opt/SMOKI/bot log -3 --oneline || true
+            git -C /opt/SMOKI/bot status --short || true
+            echo "## Сервисы smoki-*"
+            systemctl list-units 'smoki-*' --no-pager --plain || true
+          } > "$RUNNER_TEMP/server.txt" 2>&1
+
+      - name: Prepare task
         run: |
           git config user.name "ai-agent"
           git config user.email "ai-agent@users.noreply.github.com"
-          git checkout -b "agent/issue-$ISSUE_NUM"
+          git checkout -b "$RUN_BRANCH"
           {
-            printf '%s\n\n%s\n\n' "$ISSUE_TITLE" "$ISSUE_BODY"
+            printf '%s\n\n%s\n\n' "$ISSUE_TITLE" "$TASK_TEXT"
             printf '%s\n' \
               '---' \
               'Правила проекта (docs/SPEC.md, обязательны):' \
               '- Не меняй .github/, requirements*.txt и docs/SPEC.md.' \
-              '- Не меняй схему БД (db/schema.sql) и миграции, если задача прямо этого не требует.' \
-              '- Ценные проверки оформляй постоянными pytest-тестами в tests/ (фикстура tmp_db), а не разовыми скриптами.' \
-              '- Перед завершением убедись, что ruff и mypy проходят на изменённых файлах.'
+              '- Не читай и не выводи .env, *.db, *.session и любые секреты.' \
+              '- Не меняй схему БД, если задача прямо этого не требует.' \
+              '- Проверки оформляй pytest-тестами в tests/.' \
+              '- Перед завершением ruff и mypy должны проходить на изменённых файлах.' \
+              '- Если задача — вопрос, ничего не меняй, ответь текстом.' \
+              '- В конце дай отчёт: что сделано, что проверено, что неясно.' \
+              '' \
+              'Снимок состояния сервера (только чтение):'
+            cat "$RUNNER_TEMP/server.txt"
           } > "$RUNNER_TEMP/task.txt"
 
       - name: Run agent (Gemini)
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        id: agent
+        continue-on-error: true
         run: |
+          set -o pipefail
           aider \
             --model gemini/gemini-3.1-pro-preview \
             --yes-always \
             --no-gitignore \
+            --no-pretty \
             --no-suggest-shell-commands \
             --no-check-update \
             --chat-history-file "$RUNNER_TEMP/aider.chat.md" \
             --input-history-file "$RUNNER_TEMP/aider.input" \
             --read docs/SPEC.md \
-            --message-file "$RUNNER_TEMP/task.txt"
+            --message-file "$RUNNER_TEMP/task.txt" 2>&1 | tee "$RUNNER_TEMP/aider.out"
 
       - name: Guard protected paths
+        id: guard
+        continue-on-error: true
         run: |
           git fetch origin main
           if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-            echo "::error::Есть незакоммиченные изменения, PR не создаём"
-            git status --short
-            exit 1
+            echo "::error::Есть незакоммиченные изменения"; git status --short; exit 1
           fi
           changed="$(git diff --name-only origin/main HEAD)"
           if echo "$changed" | grep -E '^(\.github/|requirements[^/]*\.txt$|docs/SPEC\.md$|db/schema\.sql$)'; then
-            echo "::error::Агент изменил защищённые файлы, PR не создаём"
-            echo "$changed"
-            exit 1
+            echo "::error::Защищённые файлы изменены"; echo "$changed"; exit 1
+          fi
+          if git diff --quiet origin/main HEAD; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Local checks
+        id: checks
+        if: steps.guard.outcome == 'success' && steps.guard.outputs.has_changes == 'true'
+        continue-on-error: true
         run: |
           ruff check . --exclude venv,data,__pycache__
           changed_py="$(git diff --name-only origin/main HEAD -- '*.py')"
-          if [ -n "$changed_py" ]; then
-            python -m mypy $changed_py
-          fi
-          python -m pytest -q
+          [ -z "$changed_py" ] || mypy $changed_py
+          pytest -q
 
       - name: Push and open PR
-        env:
-          GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
+        id: pr
+        if: steps.guard.outcome == 'success' && steps.guard.outputs.has_changes == 'true' && steps.checks.outcome == 'success'
+        continue-on-error: true
         run: |
-          git fetch origin main
-          if git diff --quiet origin/main HEAD; then
-            echo "Изменений нет, PR не создаём"
-            exit 0
-          fi
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "agent/issue-$ISSUE_NUM"
-          gh pr create --base main --head "agent/issue-$ISSUE_NUM" --title "AI: $ISSUE_TITLE" --body "Closes #$ISSUE_NUM. Проверьте diff перед merge."
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$RUN_BRANCH"
+          url="$(gh pr create --base main --head "$RUN_BRANCH" --title "AI: $ISSUE_TITLE" --body "Refs #$ISSUE_NUM. Проверьте diff перед merge.")"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
 
-      - name: Report failure
-        if: failure()
+      - name: Report to issue
+        if: always()
         env:
-          GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
+          AGENT_OUTCOME: ${{ steps.agent.outcome }}
+          GUARD_OUTCOME: ${{ steps.guard.outcome }}
+          CHECKS_OUTCOME: ${{ steps.checks.outcome }}
+          PR_OUTCOME: ${{ steps.pr.outcome }}
+          PR_URL: ${{ steps.pr.outputs.url }}
+          HAS_CHANGES: ${{ steps.guard.outputs.has_changes }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          gh issue comment "$ISSUE_NUM" --body "Агент не смог завершить задачу или проверки не прошли. Смотрите логи в Actions."
+          report="$RUNNER_TEMP/report.md"
+          {
+            echo "## Отчёт агента"
+            echo
+            echo "Лог: $RUN_URL"
+            echo
+            echo "| Этап | Результат |"
+            echo "|---|---|"
+            echo "| Агент (Gemini) | $AGENT_OUTCOME |"
+            echo "| Изменения есть | ${HAS_CHANGES:-неизвестно} |"
+            echo "| Защищённые пути | $GUARD_OUTCOME |"
+            echo "| ruff / mypy / pytest | $CHECKS_OUTCOME |"
+            echo "| Push и PR | $PR_OUTCOME |"
+            [ -n "$PR_URL" ] && echo && echo "PR: $PR_URL"
+            echo
+            echo "### Ответ агента"
+            if [ -s "$RUNNER_TEMP/aider.out" ]; then
+              tail -c 40000 "$RUNNER_TEMP/aider.out"
+            else
+              echo "_Вывода агента нет, смотрите лог._"
+            fi
+          } > "$report"
+          gh issue comment "$ISSUE_NUM" --body-file "$report"

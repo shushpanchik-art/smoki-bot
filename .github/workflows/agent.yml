@@ -8,7 +8,7 @@ jobs:
   run:
     if: github.event.label.name == 'ai-task' && github.event.sender.login == 'shushpanchik-art'
     runs-on: [self-hosted, smoki-agent]
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       ISSUE_NUM: ${{ github.event.issue.number }}
       ISSUE_TITLE: ${{ github.event.issue.title }}
@@ -24,10 +24,16 @@ jobs:
 
       - name: Install tools
         run: |
-          python3 -m venv "$RUNNER_TEMP/venv"
-          "$RUNNER_TEMP/venv/bin/pip" install -q aider-chat
-          "$RUNNER_TEMP/venv/bin/pip" install -q -r requirements.txt -r requirements-dev.txt ruff==0.15.12 mypy==1.14.1
-          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+          # aider в отдельном окружении, чтобы его зависимости не конфликтовали с проектом
+          python3 -m venv "$RUNNER_TEMP/aider-venv"
+          "$RUNNER_TEMP/aider-venv/bin/pip" install -q --upgrade pip
+          "$RUNNER_TEMP/aider-venv/bin/pip" install -q aider-chat
+
+          # зависимости проекта ставятся как есть из репозитория
+          python3 -m venv "$RUNNER_TEMP/proj-venv"
+          "$RUNNER_TEMP/proj-venv/bin/pip" install -q --upgrade pip
+          "$RUNNER_TEMP/proj-venv/bin/pip" install -q -r requirements.txt -r requirements-dev.txt
+          echo "$RUNNER_TEMP/proj-venv/bin" >> "$GITHUB_PATH"
 
       - name: Server snapshot (read-only)
         run: |
@@ -56,6 +62,7 @@ jobs:
               '- Проверки оформляй pytest-тестами в tests/.' \
               '- Перед завершением ruff и mypy должны проходить на изменённых файлах.' \
               '- Если задача — вопрос, ничего не меняй, ответь текстом.' \
+              '- Если что-то непонятно — спроси, не действуй наугад.' \
               '- В конце дай отчёт: что сделано, что проверено, что неясно.' \
               '' \
               'Снимок состояния сервера (только чтение):'
@@ -67,7 +74,7 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          aider \
+          "$RUNNER_TEMP/aider-venv/bin/aider" \
             --model gemini/gemini-3.1-pro-preview \
             --yes-always \
             --no-gitignore \
@@ -102,10 +109,10 @@ jobs:
         if: steps.guard.outcome == 'success' && steps.guard.outputs.has_changes == 'true'
         continue-on-error: true
         run: |
-          ruff check . --exclude venv,data,__pycache__
+          python -m ruff check . --exclude venv,data,__pycache__
           changed_py="$(git diff --name-only origin/main HEAD -- '*.py')"
-          [ -z "$changed_py" ] || mypy $changed_py
-          pytest -q
+          [ -z "$changed_py" ] || python -m mypy $changed_py
+          python -m pytest -q
 
       - name: Push and open PR
         id: pr

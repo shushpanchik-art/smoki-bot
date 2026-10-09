@@ -17,7 +17,7 @@
 | handlers/admin.py | test_admin, test_admin_custom_length, test_stats |
 | handlers/*.py | test_routers, test_import |
 | userbot.py | test_userbot |
-| docs/SPEC.md и любые несколько модулей | полный прогон: scripts/smoki-check.sh |
+| docs/SPEC.md и любые несколько модулей | полный прогон: ~/bin/smoki-check.sh |
 
 Запуск одного файла тестов:
     ~/.smoki-check-venv/bin/python -m pytest tests/ИМЯ.py -q

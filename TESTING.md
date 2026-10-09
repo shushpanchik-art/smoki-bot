@@ -2,7 +2,7 @@
 ## Какие тесты запускать после правки файла
 
 | Изменён файл | Тесты |
-|---|---|
+| --- | --- |
 | db/database.py, db/schema.sql | test_db, test_schema, test_integrity, test_sql_valid |
 | config.py, .env.example | test_config, test_env_example, test_secrets |
 | ai/gemini.py | test_gemini |

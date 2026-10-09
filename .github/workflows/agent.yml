@@ -3,66 +3,68 @@ name: ai-agent
 on:
   issues:
     types: [labeled]
-  issue_comment:
-    types: [created]
 
 jobs:
   run:
-    # Только владелец репозитория; запуск по метке ai-task или комментарию /agent
-    if: >-
-      github.event.sender.login == 'shushpanchik-art' &&
-      (
-        (github.event_name == 'issues' && github.event.label.name == 'ai-task') ||
-        (github.event_name == 'issue_comment' && !github.event.issue.pull_request && startsWith(github.event.comment.body, '/agent'))
-      )
-    runs-on: ubuntu-24.04
+    if: github.event.label.name == 'ai-task' && github.event.sender.login == 'shushpanchik-art'
+    runs-on: [self-hosted, smoki-agent]
     timeout-minutes: 30
     env:
       ISSUE_NUM: ${{ github.event.issue.number }}
       ISSUE_TITLE: ${{ github.event.issue.title }}
-      TASK_TEXT: ${{ github.event_name == 'issue_comment' && github.event.comment.body || github.event.issue.body }}
+      TASK_TEXT: ${{ github.event.issue.body }}
       RUN_BRANCH: agent/issue-${{ github.event.issue.number }}-${{ github.run_id }}
+      GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: "3.11"
-
       - name: Install tools
         run: |
-          pip install aider-chat
-          pip install -r requirements.txt -r requirements-dev.txt
-          pip install ruff==0.15.12 mypy==1.14.1
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install -q aider-chat
+          "$RUNNER_TEMP/venv/bin/pip" install -q -r requirements.txt -r requirements-dev.txt ruff==0.15.12 mypy==1.14.1
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+
+      - name: Server snapshot (read-only)
+        run: |
+          git config --global --add safe.directory /opt/SMOKI/bot
+          {
+            echo "## Git /opt/SMOKI/bot"
+            git -C /opt/SMOKI/bot log -3 --oneline || true
+            git -C /opt/SMOKI/bot status --short || true
+            echo "## Сервисы smoki-*"
+            systemctl list-units 'smoki-*' --no-pager --plain || true
+          } > "$RUNNER_TEMP/server.txt" 2>&1
 
       - name: Prepare task
         run: |
           git config user.name "ai-agent"
           git config user.email "ai-agent@users.noreply.github.com"
           git checkout -b "$RUN_BRANCH"
-          task="${TASK_TEXT#/agent}"
           {
-            printf '%s\n\n%s\n\n' "$ISSUE_TITLE" "$task"
+            printf '%s\n\n%s\n\n' "$ISSUE_TITLE" "$TASK_TEXT"
             printf '%s\n' \
               '---' \
               'Правила проекта (docs/SPEC.md, обязательны):' \
               '- Не меняй .github/, requirements*.txt и docs/SPEC.md.' \
-              '- Не меняй схему БД (db/schema.sql) и миграции, если задача прямо этого не требует.' \
-              '- Ценные проверки оформляй постоянными pytest-тестами в tests/ (фикстура tmp_db), а не разовыми скриптами.' \
-              '- Перед завершением убедись, что ruff и mypy проходят на изменённых файлах.' \
-              '- Если задача — вопрос или непонятна, ничего не меняй, а ответь текстом.' \
-              '- В конце ответь коротким отчётом: что сделано, что проверено, что осталось неясным.'
+              '- Не читай и не выводи .env, *.db, *.session и любые секреты.' \
+              '- Не меняй схему БД, если задача прямо этого не требует.' \
+              '- Проверки оформляй pytest-тестами в tests/.' \
+              '- Перед завершением ruff и mypy должны проходить на изменённых файлах.' \
+              '- Если задача — вопрос, ничего не меняй, ответь текстом.' \
+              '- В конце дай отчёт: что сделано, что проверено, что неясно.' \
+              '' \
+              'Снимок состояния сервера (только чтение):'
+            cat "$RUNNER_TEMP/server.txt"
           } > "$RUNNER_TEMP/task.txt"
 
       - name: Run agent (Gemini)
         id: agent
         continue-on-error: true
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           set -o pipefail
           aider \
@@ -70,7 +72,6 @@ jobs:
             --yes-always \
             --no-gitignore \
             --no-pretty \
-            --no-stream \
             --no-suggest-shell-commands \
             --no-check-update \
             --chat-history-file "$RUNNER_TEMP/aider.chat.md" \
@@ -78,26 +79,22 @@ jobs:
             --read docs/SPEC.md \
             --message-file "$RUNNER_TEMP/task.txt" 2>&1 | tee "$RUNNER_TEMP/aider.out"
 
-      - name: Check changes and guard protected paths
+      - name: Guard protected paths
         id: guard
         continue-on-error: true
         run: |
           git fetch origin main
+          if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+            echo "::error::Есть незакоммиченные изменения"; git status --short; exit 1
+          fi
+          changed="$(git diff --name-only origin/main HEAD)"
+          if echo "$changed" | grep -E '^(\.github/|requirements[^/]*\.txt$|docs/SPEC\.md$|db/schema\.sql$)'; then
+            echo "::error::Защищённые файлы изменены"; echo "$changed"; exit 1
+          fi
           if git diff --quiet origin/main HEAD; then
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
           else
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
-          fi
-          if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-            echo "::error::Есть незакоммиченные изменения"
-            git status --short
-            exit 1
-          fi
-          changed="$(git diff --name-only origin/main HEAD)"
-          if echo "$changed" | grep -E '^(\.github/|requirements[^/]*\.txt$|docs/SPEC\.md$|db/schema\.sql$)'; then
-            echo "::error::Агент изменил защищённые файлы"
-            echo "$changed"
-            exit 1
           fi
 
       - name: Local checks
@@ -107,17 +104,13 @@ jobs:
         run: |
           ruff check . --exclude venv,data,__pycache__
           changed_py="$(git diff --name-only origin/main HEAD -- '*.py')"
-          if [ -n "$changed_py" ]; then
-            python -m mypy $changed_py
-          fi
-          python -m pytest -q
+          [ -z "$changed_py" ] || mypy $changed_py
+          pytest -q
 
       - name: Push and open PR
         id: pr
         if: steps.guard.outcome == 'success' && steps.guard.outputs.has_changes == 'true' && steps.checks.outcome == 'success'
         continue-on-error: true
-        env:
-          GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
         run: |
           git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$RUN_BRANCH"
           url="$(gh pr create --base main --head "$RUN_BRANCH" --title "AI: $ISSUE_TITLE" --body "Refs #$ISSUE_NUM. Проверьте diff перед merge.")"
@@ -126,7 +119,6 @@ jobs:
       - name: Report to issue
         if: always()
         env:
-          GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
           AGENT_OUTCOME: ${{ steps.agent.outcome }}
           GUARD_OUTCOME: ${{ steps.guard.outcome }}
           CHECKS_OUTCOME: ${{ steps.checks.outcome }}
@@ -139,44 +131,22 @@ jobs:
           {
             echo "## Отчёт агента"
             echo
-            echo "Лог запуска: $RUN_URL"
+            echo "Лог: $RUN_URL"
             echo
             echo "| Этап | Результат |"
             echo "|---|---|"
-            echo "| Работа агента (Gemini) | $AGENT_OUTCOME |"
-            echo "| Есть изменения в коммитах | ${HAS_CHANGES:-неизвестно} |"
+            echo "| Агент (Gemini) | $AGENT_OUTCOME |"
+            echo "| Изменения есть | ${HAS_CHANGES:-неизвестно} |"
             echo "| Защищённые пути | $GUARD_OUTCOME |"
             echo "| ruff / mypy / pytest | $CHECKS_OUTCOME |"
             echo "| Push и PR | $PR_OUTCOME |"
-            if [ -n "$PR_URL" ]; then
-              echo
-              echo "PR: $PR_URL"
-            fi
-            if [ "$HAS_CHANGES" = "true" ]; then
-              echo
-              echo "### Изменённые файлы"
-              echo '```'
-              git diff --stat origin/main HEAD 2>/dev/null || true
-              echo '```'
-            fi
+            [ -n "$PR_URL" ] && echo && echo "PR: $PR_URL"
             echo
             echo "### Ответ агента"
-            echo
             if [ -s "$RUNNER_TEMP/aider.out" ]; then
               tail -c 40000 "$RUNNER_TEMP/aider.out"
             else
-              echo "_Агент не вернул вывод. Смотрите лог шага Run agent (Gemini)._"
+              echo "_Вывода агента нет, смотрите лог._"
             fi
           } > "$report"
           gh issue comment "$ISSUE_NUM" --body-file "$report"
-
-      - name: Final status
-        if: always()
-        env:
-          AGENT_OUTCOME: ${{ steps.agent.outcome }}
-          GUARD_OUTCOME: ${{ steps.guard.outcome }}
-          CHECKS_OUTCOME: ${{ steps.checks.outcome }}
-        run: |
-          [ "$AGENT_OUTCOME" = "success" ] || exit 1
-          [ "$GUARD_OUTCOME" = "success" ] || exit 1
-          [ "$CHECKS_OUTCOME" != "failure" ] || exit 1

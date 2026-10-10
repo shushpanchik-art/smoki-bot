@@ -22,6 +22,7 @@
 **Сервер:** telegram-bot (Debian 12, GCP, зона us-central1-c, проект project-dfb3fb77-77cb-4e79-bbb).
 
 **Пользователи:**
+
 - `artemijvisnevskij` — рабочий пользователь для SSH и разведки. Группы google-sudoers и docker, есть sudo.
 - `shushpanchik_art` — владелец файлов проекта /opt/SMOKI/bot (.env, smoki.db, .git). Прямой SSH под этим пользователем не настроен.
 

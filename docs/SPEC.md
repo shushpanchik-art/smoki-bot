@@ -23,7 +23,7 @@
 
 **Пользователи:**
 
-- `artemijvisnevskij` — рабочий пользователь для SSH и разведки. Группы google-sudoers и docker, есть sudo.
+- `artemijvisnevskij` — рабочий пользователь для SSH и разведки. sudo без пароля на все команды (через группу google-sudoers). Также состоит в группах docker, lxd, adm: docker и lxd дают права, равные root.
 - `shushpanchik_art` — владелец файлов проекта /opt/SMOKI/bot (.env, smoki.db, .git). Прямой SSH под этим пользователем не настроен.
 
 **Вход с Mac (по SSH-ключу):**
@@ -51,7 +51,7 @@ systemctl list-timers 'smoki-*' --no-pager
 journalctl -u smoki-bot -n50 --no-pager
 ```
 
-**Sudo.** Без пароля разрешены только systemctl restart/start/stop/status smoki-bot (drop-in /etc/sudoers.d/smoki-bot). Проверка синтаксиса: `sudo visudo -c`.
+**Sudo.** У artemijvisnevskij sudo без пароля на все команды. Правила для smoki-bot лежат в /etc/sudoers.d/smoki-bot; их содержимое в этом разделе не описано, сверяйте командой `sudo cat /etc/sudoers.d/smoki-bot`. Проверка синтаксиса: `sudo visudo -c`.
 
 ## AI
 

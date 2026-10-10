@@ -13,7 +13,7 @@
 - БД smoki.db: published_topics, articles, comments, ai_logs, settings, story_jobs, saga_state, saga_summaries (схема в db/schema.sql), saga_posts (создаётся миграцией _migrate_saga в db/database.py)
 - Управление: systemctl restart smoki-bot; journalctl -u smoki-bot -n50
 - Таймеры systemd (факт, telegram-bot): smoki-backup, smoki-backup-offsite, smoki-backup-full-offsite, smoki-backup-summary, smoki-backup-restore-test, smoki-heartbeat, smoki-publish-check (каждые 6 ч, сторож свежести публикаций).
-- smoki-publish-check: юнит есть на сервере (/etc/systemd/system, создан 8 окт.), в main ещё не смёржен (ветка feat/publish-freshness-watchdog). Версию из репозитория синхронизировать с сервером.
+- smoki-publish-check: юнит лежит в deploy/systemd/ (в main) и установлен на сервере в /etc/systemd/system (8 окт.). Версии различаются (разный набор строк в [Unit]/[Service]): сверить и выровнять.
 - GitHub self-hosted runner: actions.runner.shushpanchik-art-smoki-bot.smoki-agent.service (работает на сервере).
 - Файлы таймеров *.timer.bak-20260713 в /etc/systemd/system — устаревшие, удалить после сверки.
 
@@ -51,7 +51,7 @@ systemctl list-timers 'smoki-*' --no-pager
 journalctl -u smoki-bot -n50 --no-pager
 ```
 
-**Sudo.** У artemijvisnevskij sudo без пароля на все команды. Правила для smoki-bot лежат в /etc/sudoers.d/smoki-bot; их содержимое в этом разделе не описано, сверяйте командой `sudo cat /etc/sudoers.d/smoki-bot`. Проверка синтаксиса: `sudo visudo -c`.
+**Sudo.** У artemijvisnevskij sudo без пароля на все команды. Файл /etc/sudoers.d/smoki-bot даёт shushpanchik_art без пароля только systemctl restart/start/stop/status smoki-bot и journalctl -u smoki-bot. Проверка синтаксиса: `sudo visudo -c`.
 
 ## AI
 

@@ -13,7 +13,7 @@
 - БД smoki.db: published_topics, articles, comments, ai_logs, settings, story_jobs, saga_state, saga_summaries (схема в db/schema.sql), saga_posts (создаётся миграцией _migrate_saga в db/database.py)
 - Управление: systemctl restart smoki-bot; journalctl -u smoki-bot -n50
 - Таймеры systemd (факт, telegram-bot): smoki-backup, smoki-backup-offsite, smoki-backup-full-offsite, smoki-backup-summary, smoki-backup-restore-test, smoki-heartbeat, smoki-publish-check (каждые 6 ч, сторож свежести публикаций).
-- smoki-publish-check: юнит лежит в deploy/systemd/ (в main) и установлен на сервере в /etc/systemd/system (8 окт.). Версии различаются (разный набор строк в [Unit]/[Service]): сверить и выровнять.
+- smoki-publish-check: юнит в deploy/systemd/ совпадает с установленным в /etc/systemd/system (проверено 10 окт., добавлен User=shushpanchik_art). Порог свежести 26 ч, пинг в healthchecks.
 - GitHub self-hosted runner: actions.runner.shushpanchik-art-smoki-bot.smoki-agent.service (работает на сервере).
 - Файлы таймеров *.timer.bak-20260713 в /etc/systemd/system — устаревшие, удалить после сверки.
 

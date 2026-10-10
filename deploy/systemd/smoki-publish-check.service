@@ -5,6 +5,7 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
+User=shushpanchik_art
 Type=oneshot
 Environment=BOT_DIR=/opt/SMOKI/bot
 ExecStart=/bin/bash /opt/SMOKI/bot/scripts/publish_freshness_check.sh

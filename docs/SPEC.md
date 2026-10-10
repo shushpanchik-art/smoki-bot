@@ -7,10 +7,50 @@
 ## Инфраструктура
 
 - Путь: /opt/SMOKI/bot, venv venv/bin/python
+- GCP-проект: project-dfb3fb77-77cb-4e79-bbb (он же «smoktolkbot»), регион us-central1. Проект общий с smoktolk_bot: биллинг и сервисный аккаунт тоже общие.
 - systemd: smoki-bot (Restart=always), режим polling
 - Python 3.11.2, aiogram 3.30.0, aiosqlite 0.22.1, apscheduler 3.11.3, SQLAlchemy 2.0.51 (persistent jobstore), python-dotenv 1.2.2, Pillow 12.3.0, telethon 1.44.0, google-genai 2.13.0, google-cloud-bigquery 3.27.0
 - БД smoki.db: published_topics, articles, comments, ai_logs, settings, story_jobs, saga_state, saga_summaries (схема в db/schema.sql), saga_posts (создаётся миграцией _migrate_saga в db/database.py)
 - Управление: systemctl restart smoki-bot; journalctl -u smoki-bot -n50
+- Таймеры systemd (факт, telegram-bot): smoki-backup, smoki-backup-offsite, smoki-backup-full-offsite, smoki-backup-summary, smoki-backup-restore-test, smoki-heartbeat, smoki-publish-check (каждые 6 ч, сторож свежести публикаций).
+- smoki-publish-check: юнит есть на сервере (/etc/systemd/system, создан 8 окт.), в main ещё не смёржен (ветка feat/publish-freshness-watchdog). Версию из репозитория синхронизировать с сервером.
+- GitHub self-hosted runner: actions.runner.shushpanchik-art-smoki-bot.smoki-agent.service (работает на сервере).
+- Файлы таймеров *.timer.bak-20260713 в /etc/systemd/system — устаревшие, удалить после сверки.
+
+## Доступ к серверу
+
+**Сервер:** telegram-bot (Debian 12, GCP, зона us-central1-c, проект project-dfb3fb77-77cb-4e79-bbb).
+
+**Пользователи:**
+- `artemijvisnevskij` — рабочий пользователь для SSH и разведки. Группы google-sudoers и docker, есть sudo.
+- `shushpanchik_art` — владелец файлов проекта /opt/SMOKI/bot (.env, smoki.db, .git). Прямой SSH под этим пользователем не настроен.
+
+**Вход с Mac (по SSH-ключу):**
+
+```bash
+ssh artemijvisnevskij@<SERVER_HOST>
+```
+
+Если SSH не работает, вход через консоль GCP:
+
+```bash
+gcloud compute ssh telegram-bot --project=project-dfb3fb77-77cb-4e79-bbb --zone=us-central1-c
+```
+
+Для диагностики: `--troubleshoot` или `--tunnel-through-iap`.
+
+**Права на файлы.** Файлы /opt/SMOKI/bot принадлежат shushpanchik_art, права 600. Чтение .env и работа с базой — через sudo. Владельца не менять: процесс бота работает под пользователем из юнита systemd.
+
+**Проверка на сервере:**
+
+```bash
+sudo grep -E '^(GOOGLE_CLOUD_PROJECT|GOOGLE_CLOUD_LOCATION)=' /opt/SMOKI/bot/.env
+systemctl status smoki-bot --no-pager
+systemctl list-timers 'smoki-*' --no-pager
+journalctl -u smoki-bot -n50 --no-pager
+```
+
+**Sudo.** Без пароля разрешены только systemctl restart/start/stop/status smoki-bot (drop-in /etc/sudoers.d/smoki-bot). Проверка синтаксиса: `sudo visudo -c`.
 
 ## AI
 
@@ -48,7 +88,6 @@
 - services: content, publisher, comments, stories, story_render, saga, schedule_view, schedule_control, billing
 - db (schema.sql, database.py)
 - ai (gemini.py, prompts.py)
-- services (content.py, publisher.py, comments.py)
 - handlers (admin.py, group.py, ROUTERS)
 - scripts/ai_healthcheck.py
 - docs (SPEC.md, TESTING.md, PROJECT_BOOK.txt, DEPS_TREE.txt — дерево зависимостей venv, pipdeptree)
@@ -182,8 +221,8 @@ Message|InaccessibleMessage. При /start отправляется ReplyKeyboar
 - **Чистка веток-зомби**: смёрженные локальные ветки удалять `git branch -d <name>`;
   устаревшие remote-tracking refs — `git remote prune origin`.
   После merge PR через UI удалённая ветка на GitHub исчезает, локально остаётся зомби.
-- **Кэш байткода**: каталоги `**pycache**` покрыты `.gitignore`, git их не видит; периодически чистить
-  `find . -path ./venv -prune -o -name **pycache** -type d -exec rm -rf {} +`.
+- **Кэш байткода**: каталоги `__pycache__` покрыты `.gitignore`, git их не видит; периодически чистить
+  `find . -path ./venv -prune -o -name __pycache__ -type d -exec rm -rf {} +`.
 - **journalctl**: для свежих логов после рестарта надёжнее `--since` по времени,
   чем `-n50` (последнее может захватить хвост старого процесса).
 
@@ -211,7 +250,7 @@ gh run view <ID> --json jobs -q '.jobs[] | .name + ": " + .conclusion'
 - `steps=0` у всех — биллинг/инфраструктура, не код.
 - `steps>0` плюс конкретный упавший шаг — реальная ошибка, чинить предметно.
 
-Лечение (по приоритету):
+Лечение (по приоритету; пункт 1 уже выполнен, репозиторий публичный):
 
 1. Сделать репозиторий публичным — Actions становятся бесплатны (текущее
    решение). ВАЖНО: перед публикацией прогнать `gitleaks detect` по всей
@@ -503,7 +542,7 @@ Premium = 1 буст). Напрямую за Telegram Stars буст НЕ пок
 от аудитории ИЛИ решение владельца платить помесячно. Код публикатора
 (U6.5, userbot.py) уже готов — при разморозке остаётся ручной шаг U6.5b.
 
-- [ ] U6.5b РУЧНОЙ ПРОД-ШАГ (ждёт API от владельца): реальные `TG_API_ID`/`TG_API_HASH`/`TG_USERBOT_PHONE` в `.env`; интерактивная авторизация сессии (SMS-код, первый запуск в TTY); буст канала @SMOKTOLK до уровня Stories; `pip install telethon==1.44.0` в venv; `systemctl enable --now smoki-userbot`. БЕЗ буста SendStoryRequest вернёт ошибку прав — прод-запуск только после буста.
+- [ ] U6.5b РУЧНОЙ ПРОД-ШАГ (ждёт API от владельца; на сервере юнит smoki-userbot НЕ установлен — systemctl is-enabled даёт not-found, процесс не запущен): реальные `TG_API_ID`/`TG_API_HASH`/`TG_USERBOT_PHONE` в `.env`; интерактивная авторизация сессии (SMS-код, первый запуск в TTY); буст канала @SMOKTOLK до уровня Stories; `pip install telethon==1.44.0` в venv; `systemctl enable --now smoki-userbot`. БЕЗ буста SendStoryRequest вернёт ошибку прав — прод-запуск только после буста.
 
 ### U6.7 Наложение текста на картинку (Pillow)
 
@@ -630,7 +669,7 @@ RPM/TPM, не «остаток»). AI Studio free-tier остаток тоже �
       траты/бюджет проекта, а не оценку. Риск/объём подтвердить у владельца
       перед стартом. Пока считаем достаточным U9a.
 
-## U10 — Onboarding: подписчик бота → приглашение в канал @SMOKTOLK [РЕАЛИЗОВАНО в smoktolk_bot]
+## U10 — Onboarding: подписчик бота → приглашение в канал @SMOKTOLK [ДРУГОЙ ПРОЕКТ smoktolk_bot — справочно, основное описание в PROJECT_BOOK]
 
 Идея владельца: кто в будущем нажмёт /start у бота-подписки (проект-сосед
 smoktolk_bot, /opt/smoktolk/bot) — автоматически «цепляется» к каналу.

@@ -27,3 +27,6 @@ saga_snapshot.json
 .env.*
 !.env.example
 data/*.db
+
+# Claude Code локальные настройки
+.claude/

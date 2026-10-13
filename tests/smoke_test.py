@@ -62,7 +62,8 @@ async def test_database():
 
         # Проверка структуры
         import aiosqlite
-        async with aiosqlite.connect(db.DB_PATH) as conn:
+        import config
+        async with aiosqlite.connect(config.DB_PATH) as conn:
             cursor = await conn.execute("SELECT COUNT(*) FROM settings")
             count = (await cursor.fetchone())[0]
         print(f"  ✅ Таблица settings ({count} записей)")

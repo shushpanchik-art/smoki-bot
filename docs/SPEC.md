@@ -9,7 +9,7 @@
 - Путь: /opt/SMOKI/bot, venv venv/bin/python
 - GCP-проект: project-dfb3fb77-77cb-4e79-bbb (он же «smoktolkbot»), регион us-central1. Проект общий с smoktolk_bot: биллинг и сервисный аккаунт тоже общие.
 - systemd: smoki-bot (Restart=always), режим polling
-- Python 3.11.2, aiogram 3.30.0, aiosqlite 0.22.1, apscheduler 3.11.3, SQLAlchemy 2.0.51 (persistent jobstore), python-dotenv 1.2.2, Pillow 12.3.0, telethon 1.44.0, google-genai 2.13.0, google-cloud-bigquery 3.27.0
+- Python 3.11.2, aiogram 3.30.0, aiosqlite 0.22.1, apscheduler 3.11.3, SQLAlchemy 2.0.52 (persistent jobstore), python-dotenv 1.2.4, Pillow 12.3.0, telethon 1.44.0, google-genai 2.19.0, google-cloud-bigquery 3.43.0
 - БД smoki.db: published_topics, articles, comments, ai_logs, settings, story_jobs, saga_state, saga_summaries (схема в db/schema.sql), saga_posts (создаётся миграцией _migrate_saga в db/database.py)
 - Управление: systemctl restart smoki-bot; journalctl -u smoki-bot -n50
 - Таймеры systemd (факт, telegram-bot): smoki-backup, smoki-backup-offsite, smoki-backup-full-offsite, smoki-backup-summary, smoki-backup-restore-test, smoki-heartbeat, smoki-publish-check (каждые 6 ч, сторож свежести публикаций).

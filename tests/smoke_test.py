@@ -40,9 +40,9 @@ async def test_config():
             print(f"  {status_icon} {key}")
 
         if config.SERPER_API_KEY:
-            print(f"  ✅ SERPER_API_KEY (optional)")
+            print("  ✅ SERPER_API_KEY (optional)")
         else:
-            print(f"  ⚠️  SERPER_API_KEY не задан (fallback на Google grounding)")
+            print("  ⚠️  SERPER_API_KEY не задан (fallback на Google grounding)")
 
         return all_ok
     except Exception as e:
@@ -90,7 +90,7 @@ async def test_gemini():
             print(f"  ✅ Gemini ответил: '{result[:50]}'")
             return True
         else:
-            print(f"  ❌ Gemini вернул пустой ответ")
+            print("  ❌ Gemini вернул пустой ответ")
             return False
     except Exception as e:
         print(f"  ❌ Ошибка Gemini: {e}")
@@ -104,7 +104,7 @@ async def test_serper():
         import config
 
         if not config.SERPER_API_KEY:
-            print(f"  ⊘ SERPER_API_KEY не задан (пропускаем)")
+            print("  ⊘ SERPER_API_KEY не задан (пропускаем)")
             return True  # Не критично
 
         from ai.search import search_news
@@ -112,13 +112,13 @@ async def test_serper():
         news = await search_news("вейп", days=7, num_results=3)
 
         if news is None:
-            print(f"  ⊘ Serper API недоступен (используется fallback)")
+            print("  ⊘ Serper API недоступен (используется fallback)")
             return True
         elif len(news) > 0:
             print(f"  ✅ Serper вернул {len(news)} новостей")
             return True
         else:
-            print(f"  ⚠️  Serper вернул 0 результатов (возможно, нет новостей)")
+            print("  ⚠️  Serper вернул 0 результатов (возможно, нет новостей)")
             return True  # Не критично
     except Exception as e:
         print(f"  ⚠️  Ошибка Serper (используется fallback): {e}")
@@ -133,7 +133,7 @@ async def test_telegram():
         import config
 
         if not config.BOT_TOKEN:
-            print(f"  ❌ BOT_TOKEN не задан")
+            print("  ❌ BOT_TOKEN не задан")
             return False
 
         bot = Bot(token=config.BOT_TOKEN)
@@ -161,7 +161,7 @@ async def test_systemd():
         )
 
         if result.returncode != 0:
-            print(f"  ⊘ systemd недоступен (пропускаем, не на сервере)")
+            print("  ⊘ systemd недоступен (пропускаем, не на сервере)")
             return True
 
         # Проверяем статус smoki-bot
@@ -174,13 +174,13 @@ async def test_systemd():
 
         status = result.stdout.strip()
         if status == "active":
-            print(f"  ✅ smoki-bot.service: active")
+            print("  ✅ smoki-bot.service: active")
             return True
         else:
             print(f"  ⚠️  smoki-bot.service: {status}")
             return True  # Не критично для локального smoke-теста
     except FileNotFoundError:
-        print(f"  ⊘ systemctl не найден (пропускаем, не на сервере)")
+        print("  ⊘ systemctl не найден (пропускаем, не на сервере)")
         return True
     except Exception as e:
         print(f"  ⚠️  Ошибка проверки systemd: {e}")

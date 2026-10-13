@@ -17,7 +17,7 @@ def test_generation_failure_alerts_admin(monkeypatch):
     monkeypatch.setattr(scheduler, "_bot", FakeBot())
     monkeypatch.setattr(scheduler.content, "generate_article", boom)
 
-    asyncio.run(scheduler._generate_and_moderate("short", "тест"))
+    asyncio.run(scheduler._generate_and_moderate("short", "тест", "publish_deadline"))
 
     assert sent.get("chat_id") == config.ADMIN_CHAT_ID, "алерт не ушёл админу"
     assert "УПАЛА" in sent.get("text", ""), "текст алерта не тот"

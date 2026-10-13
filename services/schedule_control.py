@@ -22,8 +22,8 @@ SETTING_KEY = "paused_jobs"
 PAUSABLE_JOBS: dict[str, str] = {
     "daily_morning": "\u2600\ufe0f Утренний",
     "daily_evening": "\U0001F319 Вечерний",
-    "publish_deadline": "\u23F0 Дедлайн (день)",
-    "publish_deadline_evening": "\u23F0 Дедлайн (вечер)",
+    "publish_deadline": "\u270B Модерация (день)",
+    "publish_deadline_evening": "\u270B Модерация (вечер)",
     "process_comments": "\U0001F4AC Комментарии",
     "plan_stories_channel": "\U0001F4F8 Сторис (канал)",
     "plan_stories_flood": "\U0001F4F8 Сторис (флуд)",

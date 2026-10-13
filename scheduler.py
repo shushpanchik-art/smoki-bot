@@ -20,8 +20,19 @@ _scheduler: AsyncIOScheduler | None = None
 _bot: Bot | None = None
 
 
-async def _generate_and_moderate(length_hint: str, label: str):
+async def _generate_and_moderate(length_hint: str, label: str, job_id: str):
+    """Генерация статьи с модерацией или автопубликацией.
+
+    job_id определяет соответствующую джобу модерации:
+    - "утро" → проверяет "publish_deadline" (модерация дня)
+    - "вечер" → проверяет "publish_deadline_evening" (модерация вечера)
+
+    Если модерация включена (джоба НЕ на паузе) → отправляет на модерацию админу.
+    Если модерация выключена (джоба на паузе) → публикует сразу автоматически.
+    """
     from handlers import admin
+    from services import schedule_control
+
     logger.info("Планировщик: старт генерации (%s)", label)
     assert _bot is not None
     bot = _bot
@@ -37,8 +48,40 @@ async def _generate_and_moderate(length_hint: str, label: str):
             except Exception:
                 logger.exception("Не смог уведомить админа")
             return
-        await admin.send_for_moderation(bot, res["article_id"])
-        logger.info("Статья #%s отправлена на модерацию", res["article_id"])
+
+        article_id = res["article_id"]
+
+        # Проверяем статус модерации для этой джобы
+        moderation_enabled = not await schedule_control.is_paused(job_id)
+
+        if moderation_enabled:
+            # Модерация включена → отправляем админу на модерацию
+            await admin.send_for_moderation(bot, article_id)
+            logger.info("Статья #%s отправлена на модерацию (%s)", article_id, label)
+        else:
+            # Модерация выключена → публикуем сразу автоматически
+            pub_res = await publisher.publish_article(bot, article_id)
+            if pub_res.get("ok"):
+                logger.info("Статья #%s опубликована автоматически (модерация выключена, %s)",
+                           article_id, label)
+                # Уведомляем админа о автопубликации
+                try:
+                    await bot.send_message(
+                        config.ADMIN_CHAT_ID,
+                        f"✅ Статья #{article_id} опубликована автоматически ({label}, модерация выключена)"
+                    )
+                except Exception:
+                    logger.exception("Не смог уведомить админа об автопубликации")
+            else:
+                logger.error("Ошибка автопубликации #%s: %s", article_id, pub_res.get("error"))
+                try:
+                    await bot.send_message(
+                        config.ADMIN_CHAT_ID,
+                        f"🔴 Ошибка автопубликации #{article_id} ({label}):\n{pub_res.get('error')}"
+                    )
+                except Exception:
+                    logger.exception("Не смог уведомить админа об ошибке")
+
     except Exception as e:
         logger.exception("Ошибка в плановой генерации")
         try:
@@ -51,12 +94,12 @@ async def _generate_and_moderate(length_hint: str, label: str):
 
 
 async def _job_morning():
-    """Утро: 1-3 факта + остроумный коммент → модерация."""
+    """Утро: 1-3 факта + остроумный коммент → модерация или автопубликация."""
     n_max = int(await database.get_setting("morning_facts",
                                            str(config.MORNING_LEN_DEFAULT)) or config.MORNING_LEN_DEFAULT)
     n = random.randint(1, max(1, n_max))
     logger.info("Утро: публикуем %d факт(ов) (max=%d)", n, n_max)
-    await _generate_and_moderate(prompts.facts_rules(n), "утро")
+    await _generate_and_moderate(prompts.facts_rules(n), "утро", "publish_deadline")
 
 
 def _channel_link(message_id: int) -> str:
@@ -154,7 +197,7 @@ async def _publish_saga_episode(dry_run: bool = False):
 
 
 async def _job_evening():
-    """Вечер: рандомно лонг-рид (модерация) ИЛИ эпизод саги (сразу в канал).
+    """Вечер: рандомно лонг-рид (модерация/автопубликация) ИЛИ эпизод саги (сразу в канал).
 
     Сага реже лонг-рида: вес саги = SAGA_RATIO. При ratio=0.7 →
     P(сага)=0.7/1.7≈41%, P(лонг-рид)≈59%.
@@ -170,7 +213,7 @@ async def _job_evening():
     logger.info("Вечер: лонг-рид")
     w = int(await database.get_setting("evening_words",
                                        str(config.EVENING_WORDS_DEFAULT)) or config.EVENING_WORDS_DEFAULT)
-    await _generate_and_moderate(prompts.words_rule(w), "вечер")
+    await _generate_and_moderate(prompts.words_rule(w), "вечер", "publish_deadline_evening")
 
 
 async def _job_deadline():

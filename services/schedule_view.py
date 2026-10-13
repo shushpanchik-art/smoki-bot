@@ -15,8 +15,8 @@ logger = logging.getLogger("smoki.schedule_view")
 JOB_LABELS: dict[str, str] = {
     "daily_morning": "\u2600\ufe0f Утренний пост",
     "daily_evening": "\U0001F319 Вечерний лонг-рид",
-    "publish_deadline": "\u23F0 Дедлайн-автопубликация (день)",
-    "publish_deadline_evening": "\u23F0 Дедлайн-автопубликация (вечер)",
+    "publish_deadline": "\u270B Модерация (день)",
+    "publish_deadline_evening": "\u270B Модерация (вечер)",
     "preview_warn_day": "\U0001F514 Напоминание перед дедлайном (день)",
     "preview_warn_evening": "\U0001F514 Напоминание перед дедлайном (вечер)",
     "delivery_watchdog": "\U0001F6A8 Watchdog доставки в канал",

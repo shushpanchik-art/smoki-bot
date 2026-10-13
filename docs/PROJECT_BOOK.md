@@ -410,3 +410,323 @@ SMOKI-bot — успешный пример полной автоматизац�
 - Удаление дублирования с PRD/TRD/DESIGN/DB/PLAN
 - Фокус на истории и lessons learned
 - Добавление навигации между документами
+
+---
+
+## 9. Перспективные идеи (ожидают решения)
+
+**Дата анализа:** 13 октября 2026  
+**Источник:** Анализ GitHub проектов в области AI-генерации контента и Telegram-ботов
+
+Эти улучшения были рассмотрены, но **отложены до принятия решения в будущем**. Каждая идея описана с примерами реализации и ссылками на проекты-вдохновители.
+
+---
+
+### 9.1. Template System — шаблоны для типовых статей
+
+**Источник вдохновения:** [AI Content Generator](https://github.com/topics/ai-content-generator) проекты с системами промпт-шаблонов
+
+**Что это:**  
+Готовые промпты-заготовки для популярных форматов статей вместо единого универсального промпта.
+
+**Зачем:**  
+Разнообразие форматов → больше engagement. Список легко читать в Telegram, сравнение = quick reference, инструкция = практическая ценность.
+
+**Как реализовать:**
+
+```python
+# templates.json (новый файл)
+{
+  "listicle": {
+    "name": "Топ-N список",
+    "prompt": "Напиши статью в формате топ-{n} про {topic}. Каждый пункт — отдельный подзаголовок с описанием.",
+    "example": "Топ-5 мифов о вейпах"
+  },
+  "comparison": {
+    "name": "Сравнение",
+    "prompt": "Сравни {topic_a} и {topic_b}. Используй таблицу: характеристика | {topic_a} | {topic_b}",
+    "example": "Одноразки vs под-системы"
+  },
+  "howto": {
+    "name": "Инструкция",
+    "prompt": "Пошаговая инструкция: {topic}. Начни с списка необходимого, затем нумерованные шаги.",
+    "example": "Как правильно забивать кальян"
+  }
+}
+
+# Команда админа: /post template=listicle n=7 topic="мифов о кальянах"
+# Бот подставит переменные в промпт шаблона
+```
+
+**Effort:** 2-3 дня (дизайн промптов + UI для админа + тесты)
+
+**Блокеры:** Нужно понимание, какие форматы лучше работают у аудитории → сначала собрать User Engagement Tracking данные.
+
+---
+
+### 9.2. Image Optimization — сжатие и оптимизация картинок
+
+**Источник вдохновения:** [Pillow image optimization patterns](https://pillow.readthedocs.io/en/stable/handbook/image-file-formats.html#webp)
+
+**Что это:**  
+Автоматическое сжатие картинок перед публикацией (WebP, качество 85%, ресайз до 1280px).
+
+**Зачем:**  
+Telegram сжимает сам, но коряво. Контроль качества + экономия трафика читателей (важно для мобильных тарифов).
+
+**Как реализовать:**
+
+```python
+# services/image_optimizer.py (новый модуль)
+
+from PIL import Image
+
+def optimize_image(input_path: str, output_path: str, max_width: int = 1280):
+    """
+    Оптимизация:
+    - Ресайз до max_width (сохраняя пропорции)
+    - Конвертация в WebP (меньше размер, та же качество)
+    - Качество 85% (визуально неотличимо от 100%, но в 2x легче)
+    """
+    img = Image.open(input_path)
+    
+    # Ресайз если нужно
+    if img.width > max_width:
+        ratio = max_width / img.width
+        new_height = int(img.height * ratio)
+        img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
+    
+    # Сохранить как WebP
+    img.save(output_path, "WEBP", quality=85, method=6)
+    
+    return {
+        "original_kb": os.path.getsize(input_path) / 1024,
+        "optimized_kb": os.path.getsize(output_path) / 1024,
+    }
+
+# services/content.py — использовать в generate_article()
+if make_image:
+    raw_path = await _image(topic)
+    optimized_path = raw_path.replace(".png", ".webp")
+    optimize_image(raw_path, optimized_path)
+    image_path = optimized_path
+```
+
+**Пример результата:**
+- Было: 847 KB PNG (1920x1080)
+- Стало: 156 KB WebP (1280x720)
+- Экономия: -82%, визуально одинаково
+
+**Effort:** 1 день (интеграция Pillow + тесты)
+
+**Решение:** Готово к реализации, но **низкий приоритет** — текущий Imagen уже генерирует оптимизированные картинки.
+
+---
+
+### 9.3. Backup Posting — резервный канал публикации
+
+**Источник вдохновения:** [Telegram bot failover patterns](https://core.telegram.org/bots/faq#my-bot-is-hitting-limits-how-do-i-avoid-this)
+
+**Что это:**  
+Если основной канал недоступен (забанен, технические работы Telegram), бот автоматически публикует в резервный канал.
+
+**Зачем:**  
+Continuity of business. Основной канал упал → подписчики всё равно получат контент, не заметят простоя.
+
+**Как реализовать:**
+
+```python
+# config.py — добавить
+BACKUP_CHANNEL_ID = os.getenv("BACKUP_CHANNEL_ID", "")  # @smoki_backup
+
+# services/publisher.py — модифицировать publish_article()
+
+async def publish_article(bot: Bot, article_id: int) -> bool:
+    try:
+        # Попытка публикации в основной канал
+        msg = await bot.send_photo(
+            chat_id=config.CHANNEL_ID,
+            photo=img,
+            caption=caption
+        )
+        return True
+        
+    except TelegramForbiddenError:
+        # Основной канал недоступен → резервный
+        logger.warning("Main channel unavailable, using backup")
+        
+        if not config.BACKUP_CHANNEL_ID:
+            raise  # нет резервного → ошибка
+        
+        msg = await bot.send_photo(
+            chat_id=config.BACKUP_CHANNEL_ID,
+            photo=img,
+            caption=caption + "\n\n⚠️ Опубликовано в резервном канале"
+        )
+        
+        # Алерт админу
+        await bot.send_message(
+            config.ADMIN_CHAT_ID,
+            "🚨 Основной канал недоступен!\nСтатья опубликована в резервном канале."
+        )
+        
+        return True
+```
+
+**Effort:** 1 день (логика fallback + тестирование)
+
+**Блокеры:** Нужен резервный канал (@smoki_backup) и его администрирование.
+
+**Решение:** Отложено до реального инцидента с основным каналом.
+
+---
+
+### 9.4. Content Variants A/B — А/Б тестирование заголовков
+
+**Источник вдохновения:** [A/B testing for content marketing](https://github.com/topics/ab-testing) проекты
+
+**Что это:**  
+Для одной статьи генерируется 2-3 варианта заголовка → публикуются в разное время → через неделю смотришь, какой собрал больше просмотров.
+
+**Зачем:**  
+Data-driven копирайтинг. Узнаешь, что работает: длинные заголовки или короткие? С эмодзи или без? Интрига или прямота?
+
+**Как реализовать:**
+
+```python
+# services/ab_test.py (новый модуль)
+
+async def generate_title_variants(topic: str, n: int = 3) -> list[str]:
+    """Генерирует N вариантов заголовка для одной темы."""
+    
+    prompt = f"""Предложи {n} разных заголовка для статьи на тему: {topic}
+
+Варианты должны отличаться стилем:
+1. Короткий и прямой (5-7 слов)
+2. С интригой и вопросом (8-10 слов)
+3. С цифрами и конкретикой (6-8 слов)
+
+Формат: только заголовки, по одному на строку, без номеров."""
+    
+    result = await _text(prompt, use_search=False)
+    return [line.strip() for line in result.split("\n") if line.strip()]
+
+# Пример использования в scheduler.py
+async def _generate_article_with_ab_test(topic: str):
+    # Генерируем контент (один раз)
+    article = await generate_article(topic)
+    
+    # Генерируем варианты заголовка
+    titles = await generate_title_variants(topic, n=3)
+    
+    # Публикуем вариант A сейчас
+    await publish_article(article_id, title=titles[0])
+    
+    # Публикуем вариант B через 3 дня
+    sched.add_job(
+        publish_article,
+        "date",
+        run_date=datetime.now() + timedelta(days=3),
+        args=[article_id, titles[1]]
+    )
+    
+    # Через неделю — отчёт
+    sched.add_job(
+        send_ab_report,
+        "date",
+        run_date=datetime.now() + timedelta(days=7),
+        args=[article_id, titles]
+    )
+```
+
+**Пример результата:**
+```
+📊 Результаты A/B теста:
+
+Вариант A: 1,847 просмотров
+  «Новые правила продажи вейпов»
+
+Вариант B: 2,314 просмотров  
+  «Что изменится для вейперов? Разбор нового закона»
+
+Вариант C: 1,653 просмотров
+  «7 главных изменений в законе о вейпах»
+
+🏆 Победитель: Вариант B
+```
+
+**Effort:** 3-4 дня (генерация вариантов + scheduler + отчёты + интеграция с User Engagement Tracking)
+
+**Блокеры:** Требуется **User Engagement Tracking** (views per article) для сбора метрик.
+
+**Решение:** Отложено до реализации User Engagement Tracking полностью.
+
+---
+
+### 9.5. Calendar View — визуальный календарь публикаций
+
+**Источник вдохновения:** [Content calendar tools](https://github.com/topics/content-calendar) и Telegram Mini Apps
+
+**Что это:**  
+Визуальный календарь на месяц вперёд, показывающий какие статьи когда запланированы и опубликованы.
+
+**Зачем:**  
+Сейчас ты видишь только список через "Расписание". Календарь даст полную картину: пустые дни, перегруженные дни, паттерны публикаций.
+
+**Как реализовать:**
+
+```python
+# handlers/admin.py — новая команда /calendar
+
+@router.message(Command("calendar"))
+async def cmd_calendar(msg: Message):
+    today = datetime.now()
+    
+    # Запланированные статьи из scheduler
+    scheduled = get_scheduled_posts(days=30)
+    
+    # Опубликованные статьи из БД
+    published = await db.get_published_articles(
+        since=today - timedelta(days=7),
+        until=today + timedelta(days=30)
+    )
+    
+    # Формируем календарь
+    calendar_text = format_calendar(scheduled, published)
+    
+    await msg.answer(calendar_text, parse_mode="HTML")
+
+def format_calendar(scheduled, published):
+    """
+    Вывод:
+    📅 Октябрь 2026
+    
+    ПН 14: ✅ 08:37 «Законы о вейпах» | 🕐 20:30 запланировано
+    ВТ 15: 🕐 09:15 запланировано | 🕐 19:45 запланировано  
+    СР 16: — (пусто)
+    ЧТ 17: ✅ 10:12 «История кальянов»
+    ...
+    """
+```
+
+**Польза:** Быстро увидишь, что в среду пусто → можно добавить внеплановую статью. Или что понедельник перегружен → перенести одну на вторник.
+
+**Effort:** 2 дня (функция format_calendar + тесты)
+
+**Решение:** **Низкий приоритет** — текущая команда /schedule достаточна для ежедневного мониторинга.
+
+---
+
+## 10. Заключение по новым идеям
+
+Из 10 рассмотренных идей:
+- ✅ **Реализовано сразу:** Webhook notifications, Content Suggestions, Sentiment Analysis, Smart Retry Logic, User Engagement Tracking (октябрь 2026)
+- ⏸️ **Отложено (требуют User Engagement данных):** Template System, Content Variants A/B
+- ⏸️ **Отложено (низкий приоритет):** Image Optimization, Backup Posting, Calendar View
+
+**Следующие шаги (Q4 2026 - Q1 2027):**
+1. Собрать данные User Engagement Tracking (2-4 недели)
+2. Проанализировать: какие темы/форматы лучше работают
+3. Принять решение: Template System и/или Content Variants A/B
+4. Остальные идеи — ревью через 3-6 месяцев
+

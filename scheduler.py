@@ -12,7 +12,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 import config
 from db import database
 from ai import prompts
-from services import comments, content, publisher, saga, stories
+from services import comments, content, publisher, saga, stories, webhooks
 
 logger = logging.getLogger("smoki.scheduler")
 
@@ -84,6 +84,15 @@ async def _generate_and_moderate(length_hint: str, label: str, job_id: str):
 
     except Exception as e:
         logger.exception("Ошибка в плановой генерации")
+
+        # Webhook notification
+        await webhooks.send_webhook("generation_failed", {
+            "label": label,
+            "error_type": type(e).__name__,
+            "error_message": str(e),
+            "timestamp": datetime.now().isoformat(),
+        })
+
         try:
             await bot.send_message(
                 config.ADMIN_CHAT_ID,

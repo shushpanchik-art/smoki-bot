@@ -14,7 +14,7 @@ from aiogram.types import (
 
 import config
 from db import database as db
-from services import content, publisher, stories, billing
+from services import content, publisher, stories, billing, webhooks
 from ai import prompts
 
 logger = logging.getLogger(__name__)
@@ -98,6 +98,14 @@ async def send_for_moderation(bot: Bot, article_id: int):
         bot, config.ADMIN_CHAT_ID, image_path, body,
         header=header, reply_markup=kb,
     )
+
+    # Webhook notification
+    await webhooks.send_webhook("moderation_needed", {
+        "article_id": article_id,
+        "title": art.get("topic") or "Без темы",
+        "length": len(body),
+        "has_image": bool(image_path),
+    })
 
 
 # ---------- команды ----------

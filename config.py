@@ -44,6 +44,12 @@ GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 # --- Search API (опциональный, fallback на Google grounding) ---
 SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
 
+# --- Webhooks (опциональные, для Discord/Slack интеграции) ---
+WEBHOOK_URLS = {
+    "article_published": os.getenv("WEBHOOK_ARTICLE_PUBLISHED", ""),
+    "moderation_needed": os.getenv("WEBHOOK_MODERATION_NEEDED", ""),
+    "generation_failed": os.getenv("WEBHOOK_GENERATION_FAILED", ""),
+}
 
 # --- Хранилище ---
 DB_PATH = os.getenv("DB_PATH", "/opt/SMOKI/bot/smoki.db")

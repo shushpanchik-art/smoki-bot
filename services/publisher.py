@@ -7,6 +7,7 @@ from aiogram.types import FSInputFile
 
 import config
 from db import database as db
+from services import webhooks
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,19 @@ async def publish_article(bot: Bot, article_id: int) -> dict:
         await db.set_topic_status(art["topic_id"], "published")
 
     logger.info("Статья #%s опубликована, msg_id=%s", article_id, first_msg_id)
+
+    # Webhook notification
+    channel_username = config.CHANNEL_ID.lstrip("@") if isinstance(config.CHANNEL_ID, str) and config.CHANNEL_ID.startswith("@") else None
+    message_url = f"https://t.me/{channel_username}/{first_msg_id}" if channel_username else None
+
+    await webhooks.send_webhook("article_published", {
+        "article_id": article_id,
+        "title": art.get("topic") or "Без темы",
+        "channel_id": config.CHANNEL_ID,
+        "message_id": first_msg_id,
+        "message_url": message_url,
+    })
+
     return {"ok": True, "message_id": first_msg_id}
 
 

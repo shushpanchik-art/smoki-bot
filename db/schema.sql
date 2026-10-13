@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS articles (
   regen_count INTEGER DEFAULT 0,
   length_hint TEXT,
   message_id INTEGER,
+  sentiment_score REAL DEFAULT 0.0,
   created_at TEXT DEFAULT (datetime('now')),
   published_at TEXT
 );

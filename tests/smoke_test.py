@@ -65,8 +65,7 @@ async def test_database():
         async with aiosqlite.connect(db.DB_PATH) as conn:
             cursor = await conn.execute("SELECT COUNT(*) FROM settings")
             count = (await cursor.fetchone())[0]
-        settings = {"count": count}
-        print(f"  ✅ Таблица settings ({settings["count"]} записей)")
+        print(f"  ✅ Таблица settings ({count} записей)")
 
         return True
     except Exception as e:

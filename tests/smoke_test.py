@@ -61,8 +61,12 @@ async def test_database():
         print(f"  ✅ Подключение к БД (найдено {len(topics)} использованных тем)")
 
         # Проверка структуры
-        settings = await db.get_all_settings()
-        print(f"  ✅ Таблица settings ({len(settings)} записей)")
+        import aiosqlite
+        async with aiosqlite.connect(db.DB_PATH) as conn:
+            cursor = await conn.execute("SELECT COUNT(*) FROM settings")
+            count = (await cursor.fetchone())[0]
+        settings = {"count": count}
+        print(f"  ✅ Таблица settings ({settings["count"]} записей)")
 
         return True
     except Exception as e:

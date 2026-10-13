@@ -122,7 +122,7 @@ npx markdownlint-cli2 "**/*.md"
 
 ### Структура проекта
 
-```
+```text
 smoki-bot/
 ├── bot.py              # Точка входа
 ├── config.py           # Конфигурация из .env

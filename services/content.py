@@ -9,7 +9,7 @@ import uuid
 from pathlib import Path
 
 import config
-from ai import gemini, prompts
+from ai import gemini, prompts, search as ai_search
 from db import database as db
 
 logger = logging.getLogger(__name__)
@@ -169,6 +169,45 @@ async def _default_length_hint() -> str:
     return prompts.words_rule(w)
 
 
+async def _detect_news_topic(topic: str) -> bool:
+    """Определить, является ли тема новостной по ключевым словам."""
+    topic_lower = topic.lower()
+    news_keywords = [
+        "новост", "событи", "произошл", "заявил", "объявил",
+        "запрет", "закон", "постановление", "решени", "анонс",
+        "правил", "измен", "введ", "приня"
+    ]
+    return any(kw in topic_lower for kw in news_keywords)
+
+
+async def _enrich_with_news(topic: str) -> tuple[str, str] | None:
+    """Получить контекст из Serper News API для новостных тем.
+
+    Returns:
+        (context, source): контекст для промпта и источник ("serper")
+        None: fallback на Google Search grounding
+    """
+    if not await _detect_news_topic(topic):
+        return None  # не новостная тема
+
+    try:
+        news = await ai_search.search_news(topic, days=7, num_results=5)
+
+        if news is None:  # SERPER_API_KEY не задан
+            return None
+
+        if not news:  # API ошибка или нет результатов
+            logger.info("Serper вернул пустой результат, fallback на grounding")
+            return None
+
+        context = ai_search.format_news_context(news)
+        return (context, "serper")
+
+    except Exception as e:
+        logger.warning("Serper API недоступен: %s (fallback на grounding)", e)
+        return None
+
+
 async def generate_article(topic: str | None = None,
                            extra_rules: str | None = None,
                            length_hint: str | None = None,
@@ -186,11 +225,23 @@ async def generate_article(topic: str | None = None,
     used = await db.get_used_topics()
     rules = await _accumulated_rules(extra_rules)
     daytime = prompts.daytime_label(datetime.datetime.now().hour)
-    body_raw = await _text(
-        prompts.article_prompt(
-            topic, used, extra_rules=rules, length_hint=length_hint,
-            daytime=daytime),
-        use_search=True)
+
+    # Попытка обогатить промпт новостями из Serper
+    search_result = await _enrich_with_news(topic)
+
+    base_prompt = prompts.article_prompt(
+        topic, used, extra_rules=rules,
+        length_hint=length_hint, daytime=daytime)
+
+    if search_result:
+        context, source = search_result
+        enriched_prompt = f"{base_prompt}\n\n{context}"
+        body_raw = await _text(enriched_prompt, use_search=False)
+        logger.info("Использован Serper API для новостной темы: %s", topic)
+    else:
+        # Fallback: Google Search grounding (текущее поведение)
+        body_raw = await _text(base_prompt, use_search=True)
+
     body = _clean_html(body_raw)
 
     ok, result = await censor(body)

@@ -1,4 +1,5 @@
 """Тесты чистой логики контента: _split, _clean_html, censor."""
+import pytest
 
 from services import content
 from services.publisher import _split
@@ -109,3 +110,50 @@ def test_clean_html_does_not_break_urls_and_words():
     assert content._clean_html("https://ex.com/a_b_c") == "https://ex.com/a_b_c"
     assert content._clean_html("snake_case_var") == "snake_case_var"
     assert content._clean_html("5 * 3 = 15") == "5 * 3 = 15"
+
+
+# ---------- Hybrid search (Serper API) ----------
+pytestmark = pytest.mark.asyncio
+
+
+async def test_detect_news_topic():
+    """Определение новостных тем по ключевым словам."""
+    assert await content._detect_news_topic("Новые правила продажи вейпов") is True
+    assert await content._detect_news_topic("Законы о кальянах изменились") is True
+    assert await content._detect_news_topic("История табакокурения") is False
+    assert await content._detect_news_topic("Обзор новых под-систем") is False
+
+
+async def test_enrich_with_news_no_api_key(monkeypatch):
+    """Без SERPER_API_KEY возвращает None (fallback)."""
+    import config
+
+    monkeypatch.setattr(config, "SERPER_API_KEY", "")
+
+    result = await content._enrich_with_news("Новости о вейпах")
+    assert result is None
+
+
+async def test_enrich_with_news_not_news_topic(monkeypatch):
+    """Не новостная тема → None без вызова API."""
+    result = await content._enrich_with_news("История кальянов")
+    assert result is None
+
+
+async def test_enrich_with_news_success(monkeypatch):
+    """Успешное обогащение новостного контекста."""
+    from ai import search as ai_search
+
+    async def fake_search(query, **kw):
+        return [
+            {"title": "Новость 1", "snippet": "Текст 1",
+             "source": "Источник 1", "date": "2026-10-13", "link": "https://ex.com/1"}
+        ]
+
+    monkeypatch.setattr(ai_search, "search_news", fake_search)
+
+    result = await content._enrich_with_news("Новые законы о вейпах")
+    assert result is not None
+    context, source = result
+    assert source == "serper"
+    assert "Новость 1" in context

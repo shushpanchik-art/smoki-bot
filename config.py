@@ -41,6 +41,9 @@ GOOGLE_GENAI_USE_VERTEXAI = os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "false")
 GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT", "")
 GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 
+# --- Search API (опциональный, fallback на Google grounding) ---
+SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
+
 
 # --- Хранилище ---
 DB_PATH = os.getenv("DB_PATH", "/opt/SMOKI/bot/smoki.db")

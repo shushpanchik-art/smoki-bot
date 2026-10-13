@@ -99,3 +99,11 @@ CREATE TABLE IF NOT EXISTS saga_summaries (
   summary TEXT NOT NULL,
   created_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS article_metrics (
+  article_id INTEGER PRIMARY KEY REFERENCES articles(id),
+  views INTEGER DEFAULT 0,
+  reactions INTEGER DEFAULT 0,
+  forwards INTEGER DEFAULT 0,
+  updated_at TEXT DEFAULT (datetime('now'))
+);

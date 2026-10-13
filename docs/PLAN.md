@@ -165,6 +165,63 @@
 
 ---
 
+#### P2: Мониторинг использования Serper API
+**Цель:** Детальная аналитика использования Serper API для оптимизации расходов.
+
+**Задачи:**
+- [ ] Логирование метрик в `ai_logs`: `source=serper`, количество запросов, успешность
+- [ ] Счётчик fallback на grounding (когда Serper не вернул результаты)
+- [ ] Dashboard: Serper usage vs grounding usage (по неделям)
+- [ ] Алерт: превышение free tier (>2,500 req/месяц)
+
+**Effort:** 2 дня  
+**Dependencies:** Serper API integration (✅ complete)
+
+**Метрики:**
+- `serper_requests_total` — общее количество запросов к Serper
+- `serper_success_rate` — процент успешных ответов
+- `serper_fallback_rate` — процент fallback на grounding
+- `serper_cost_estimate` — прогноз стоимости (free tier / paid)
+
+---
+
+#### P2: Расширение новостных ключевых слов
+**Цель:** Улучшить детекцию новостных тем для более точного использования Serper API.
+
+**Задачи:**
+- [ ] Расширить `_detect_news_topic()`: добавить ключевые слова
+  - Запущ*, выпуск*, представ*, исследован*, отчёт*
+  - Стат*, рынок*, тренд*, анонс*, откры*
+  - Изменен*, обновлен*, введён*, добавлен*
+- [ ] A/B тест: старый список vs расширенный (precision/recall)
+- [ ] Логировать детекцию: `detected_as_news=True/False` в `ai_logs`
+
+**Effort:** 1 день  
+**Dependencies:** Serper API integration
+
+**Ожидаемый результат:** +15-20% precision (меньше false positives — темы не о новостях определяются правильно).
+
+---
+
+#### P2: Ручное переключение источника поиска
+**Цель:** Админ может вручную выбрать Serper/grounding/auto для тестирования.
+
+**Задачи:**
+- [ ] Команда `/search_source [serper|grounding|auto]`
+  - `serper` — принудительно только Serper (для всех тем)
+  - `grounding` — принудительно только Google grounding
+  - `auto` — hybrid (default): Serper для новостей, grounding для остального
+- [ ] Сохранение в `settings` таблице: `search_source_override`
+- [ ] Индикатор в модерации: "Источник: Serper API" / "Источник: Google grounding"
+- [ ] Reset: `/search_source auto` возвращает к hybrid режиму
+
+**Effort:** 1 день  
+**Dependencies:** None
+
+**Use case:** Админ может сравнить качество статей вручную перед A/B тестом.
+
+---
+
 ### 3.2. Q1 2027 (Jan-Mar)
 
 #### P1: Мультиязычность (английский канал)
@@ -264,6 +321,18 @@
 - 💡 Personalization: разные стили для разных подписчиков
 - 💡 Collaborative features: админы могут комментировать черновики
 - 💡 Analytics API: экспорт метрик для внешних систем
+
+**Новые идеи (на основе анализа GitHub проектов, октябрь 2026):**
+- 💡 **Content calendar view** — визуализация запланированных постов на неделю/месяц (Telegram Mini App)
+- 💡 **Template system** — шаблоны для разных типов постов (новость, обзор, факт дня, история)
+- 💡 **User engagement tracking** — метрики: просмотры, реакции, комментарии per post (через Bot API stats)
+- 💡 **Smart retry logic** — exponential backoff для API ошибок вместо простого fallback
+- 💡 **Content suggestion API** — интеграция с Reddit/HN/Product Hunt для trending topics
+- 💡 **Sentiment analysis** — анализ тональности комментариев для early warning (токсичность растёт)
+- 💡 **Image optimization** — automatic resize/compress перед публикацией (сейчас raw от Imagen/Serper)
+- 💡 **Backup posting** — fallback канал/группа если основной канал недоступен
+- 💡 **Content variants** — A/B тест заголовков: генерировать 2-3 варианта, админ выбирает лучший
+- 💡 **Webhook notifications** — Discord/Slack оповещения для админа (вместо только Telegram)
 
 ---
 

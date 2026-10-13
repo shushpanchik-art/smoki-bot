@@ -28,6 +28,14 @@ def _get_session() -> aiohttp.ClientSession:
     return _session
 
 
+async def close_session() -> None:
+    """Закрыть HTTP сессию при завершении работы."""
+    global _session
+    if _session is not None:
+        await _session.close()
+        _session = None
+
+
 async def search_news(query: str, *, days: int = 7,
                      num_results: int = 5) -> list[NewsItem] | None:
     """Поиск свежих новостей через Serper News API.

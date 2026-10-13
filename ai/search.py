@@ -18,6 +18,7 @@ class NewsItem(TypedDict):
     source: str
     date: str
     link: str
+    imageUrl: str  # URL картинки новости (если есть)
 
 
 def _get_session() -> aiohttp.ClientSession:
@@ -84,7 +85,8 @@ async def search_news(query: str, *, days: int = 7,
                 snippet=item.get("snippet", ""),
                 source=item.get("source", ""),
                 date=item.get("date", ""),
-                link=item.get("link", "")
+                link=item.get("link", ""),
+                imageUrl=item.get("imageUrl", "")
             ))
 
         logger.info("Serper News: найдено %d результатов для '%s'",

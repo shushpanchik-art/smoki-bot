@@ -40,6 +40,86 @@ gcloud compute ssh telegram-bot --project=project-dfb3fb77-77cb-4e79-bbb --zone=
 
 Для диагностики: `--troubleshoot` или `--tunnel-through-iap`.
 
+### SSH доступ для ИИ (Claude Code)
+
+**Проблема:** Прямой SSH через IP-адрес не работает из-за сетевых ограничений (таймаут). Алиасы типа `smk` определены в `~/.zshrc` пользователя и недоступны ИИ.
+
+**Решение:** Использовать `gcloud compute ssh` с полными параметрами.
+
+**Обязательная команда для всех операций на сервере:**
+
+```bash
+gcloud compute ssh telegram-bot --zone=us-central1-c --project=project-dfb3fb77-77cb-4e79-bbb --command="ВАША_КОМАНДА"
+```
+
+**Ключевые параметры:**
+- `telegram-bot` — имя инстанса (НЕ IP-адрес)
+- `--zone=us-central1-c` — зона GCP (обязательно)
+- `--project=project-dfb3fb77-77cb-4e79-bbb` — ID проекта (обязательно)
+- `--command="..."` — команда для выполнения на сервере
+
+**Работа от имени владельца проекта (shushpanchik_art):**
+
+Все операции с ботом выполняются через `sudo -u shushpanchik_art`:
+
+```bash
+gcloud compute ssh telegram-bot --zone=us-central1-c --project=project-dfb3fb77-77cb-4e79-bbb \
+  --command="sudo -u shushpanchik_art bash -c 'cd /opt/SMOKI/bot && source venv/bin/activate && КОМАНДА'"
+```
+
+**Типовые сценарии:**
+
+1. **Выполнение Python-скрипта:**
+```bash
+gcloud compute ssh telegram-bot --zone=us-central1-c --project=project-dfb3fb77-77cb-4e79-bbb \
+  --command="sudo -u shushpanchik_art bash -c 'cd /opt/SMOKI/bot && source venv/bin/activate && python3 -c \"import config; print(config.CHANNEL_ID)\"'"
+```
+
+2. **Многострочный Python-код (heredoc):**
+```bash
+gcloud compute ssh telegram-bot --zone=us-central1-c --project=project-dfb3fb77-77cb-4e79-bbb \
+  --command="sudo -u shushpanchik_art bash -c 'cd /opt/SMOKI/bot && source venv/bin/activate && python3 << \"EOF\"
+import asyncio
+from services.content import generate_article
+
+async def test():
+    result = await generate_article(topic=\"Тест\", make_image=False)
+    print(\"OK\" if result[\"ok\"] else \"FAIL\")
+
+asyncio.run(test())
+EOF
+'"
+```
+
+3. **Проверка логов бота:**
+```bash
+gcloud compute ssh telegram-bot --zone=us-central1-c --project=project-dfb3fb77-77cb-4e79-bbb \
+  --command="journalctl -u smoki-bot -n 100 --no-pager | grep -E 'Serper|ERROR'"
+```
+
+4. **Выполнение smoke-тестов:**
+```bash
+gcloud compute ssh telegram-bot --zone=us-central1-c --project=project-dfb3fb77-77cb-4e79-bbb \
+  --command="sudo -u shushpanchik_art bash -c 'cd /opt/SMOKI/bot && source venv/bin/activate && python3 tests/smoke_test.py'"
+```
+
+**Важные замечания:**
+
+1. **Экранирование кавычек:** В Python-коде внутри heredoc используйте `\"` для двойных кавычек
+2. **F-strings:** Избегайте вложенных f-string с кавычками — используйте `.format()` или конкатенацию
+3. **Timeout:** Для долгих операций (генерация статей) установите `--timeout=120000` (120 секунд)
+4. **Закрытие сессий:** Всегда вызывайте `await close_session()` из `ai.search` после работы с Serper API
+
+**Поиск правильной команды для доступа:**
+
+Если `gcloud compute ssh` не работает, проверьте алиас пользователя:
+
+```bash
+grep -E "alias smk|function smk" ~/.zshrc ~/.bashrc
+```
+
+Результат покажет полную команду с правильными параметрами.
+
 **Права на файлы.** Файлы /opt/SMOKI/bot принадлежат shushpanchik_art, права 600. Чтение .env и работа с базой — через sudo. Владельца не менять: процесс бота работает под пользователем из юнита systemd.
 
 **Проверка на сервере:**

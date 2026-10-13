@@ -80,3 +80,8 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logger.info("Остановка бота")
+    finally:
+        # Закрыть HTTP сессию Serper API
+        from ai.search import close_session
+        asyncio.run(close_session())
+        logger.info("HTTP сессии закрыты")

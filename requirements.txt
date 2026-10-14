@@ -9,4 +9,4 @@ telethon==1.44.0
 google-cloud-bigquery==3.43.0
 aiohttp==3.11.11
 feedparser==6.0.11
-tenacity==9.0.0
+tenacity==9.2.1

@@ -17,10 +17,18 @@
 | handlers/admin.py | test_admin, test_admin_custom_length, test_stats |
 | handlers/*.py | test_routers, test_import |
 | userbot.py | test_userbot |
+| scripts/backup_full_offsite.sh | test_backup_full_offsite |
 | docs/SPEC.md и любые несколько модулей | полный прогон: ~/bin/smoki-check.sh |
 
 Запуск одного файла тестов:
     ~/.smoki-check-venv/bin/python -m pytest tests/ИМЯ.py -q
+
+Регрессии полного бэкапа (Linux, без зависимостей бота и сетевых вызовов):
+    python -m unittest tests.test_backup_full_offsite -v
+
+Тесты запускают настоящий скрипт с временными файлами и локальными заглушками
+`rclone` и уведомлений. Они проверяют коды tar/gzip, обе копии, ошибки загрузки,
+контрольную сумму и очистку staging; production и секреты не используются.
 
 Полный прогон (перед push):
     ~/bin/smoki-check.sh

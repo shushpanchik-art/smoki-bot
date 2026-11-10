@@ -145,6 +145,7 @@ class FullOffsiteBackupTests(unittest.TestCase):
         # Cleanup must run on success and on every tested failure.
         self.assertEqual(list(self.staging.glob("*.tmp")), [])
         self.assertEqual(list(self.staging.glob("*.tar.gz")), [])
+        self.assertEqual(list(self.staging.glob("*.tar.stderr")), [])
         return result
 
     def assert_success(self, result, tar_rc):

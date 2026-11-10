@@ -72,7 +72,7 @@ STAGED_TGZ="$STAGING_DIR/$ARCHIVE_NAME"
 log "source: $SOURCE_DIR (полный, без исключений)"
 log "target: $RCLONE_REMOTE/$ARCHIVE_NAME (+ $LATEST_NAME via server-side copy)"
 
-cleanup_staging() { rm -f "$STAGED_TGZ" "$STAGED_TGZ.tmp"; }
+cleanup_staging() { rm -f "$STAGED_TGZ" "$STAGED_TGZ.tmp" "$STAGED_TGZ.tar.stderr"; }
 trap cleanup_staging EXIT
 
 SRC_PARENT="$(dirname "$SOURCE_DIR")"

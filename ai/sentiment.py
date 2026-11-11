@@ -3,6 +3,7 @@
 U15 — Определение sentiment (positive/neutral/negative) для балансировки контента.
 Помогает избежать серий негативных статей подряд.
 """
+import asyncio
 import logging
 
 from ai.gemini import generate_text
@@ -40,7 +41,7 @@ async def analyze_sentiment(text: str) -> dict[str, str | float]:
 Ответ (только одно слово):"""
 
     try:
-        label = await generate_text(prompt, use_search=False)
+        label = await asyncio.to_thread(generate_text, prompt, use_search=False)
         label = label.strip().lower()
 
         # Валидация ответа

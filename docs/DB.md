@@ -1,4 +1,5 @@
 # Database Design Document (DB)
+
 ## SMOKI-bot — Схема базы данных
 
 **Версия:** 1.0  
@@ -13,7 +14,7 @@
 ### 1.1. Характеристики БД
 
 | Параметр | Значение |
-|----------|----------|
+| ---------- | ---------- |
 | **Тип** | SQLite (embedded) |
 | **Файл** | `data/smoki.db` |
 | **Размер** | ~50MB (производство, октябрь 2026) |
@@ -23,7 +24,7 @@
 
 ### 1.2. Таблицы
 
-```
+```text
 ┌─────────────────────┐
 │  published_topics   │  Темы постов (дедупликация)
 └──────────┬──────────┘
@@ -71,6 +72,7 @@
 **Назначение:** Хранение тем постов для предотвращения дублей.
 
 **Схема:**
+
 ```sql
 CREATE TABLE IF NOT EXISTS published_topics (
   id INTEGER PRIMARY KEY,
@@ -85,7 +87,7 @@ CREATE TABLE IF NOT EXISTS published_topics (
 **Поля:**
 
 | Поле | Тип | Описание | Пример |
-|------|-----|----------|--------|
+| ------ | ----- | ---------- | -------- |
 | `id` | INTEGER | PK, автоинкремент | 149 |
 | `title` | TEXT | Название темы | "Электронные сигареты новости октябрь 2026" |
 | `topic_hash` | TEXT | MD5 хеш темы (UNIQUE) | "a3f8d9e2..." |
@@ -94,15 +96,18 @@ CREATE TABLE IF NOT EXISTS published_topics (
 | `created_at` | TEXT | ISO datetime создания | "2026-10-13 08:47:23" |
 
 **Индексы:**
+
 ```sql
 CREATE INDEX idx_topics_status ON published_topics(status);
 CREATE INDEX idx_topics_created_at ON published_topics(created_at);
 ```
 
 **Связи:**
+
 - `1:N` → `articles.topic_id`
 
 **Правила:**
+
 - `topic_hash` — UNIQUE (защита от дублей тем)
 - `status='draft'` — тема создана, статья в модерации
 - `status='published'` — статья опубликована
@@ -114,6 +119,7 @@ CREATE INDEX idx_topics_created_at ON published_topics(created_at);
 **Назначение:** Хранение статей (текст + метаданные картинки).
 
 **Схема:**
+
 ```sql
 CREATE TABLE IF NOT EXISTS articles (
   id INTEGER PRIMARY KEY,
@@ -134,7 +140,7 @@ CREATE TABLE IF NOT EXISTS articles (
 **Поля:**
 
 | Поле | Тип | Описание | Пример |
-|------|-----|----------|--------|
+| ------ | ----- | ---------- | -------- |
 | `id` | INTEGER | PK, автоинкремент | 153 |
 | `topic_id` | INTEGER | FK → `published_topics.id` | 149 |
 | `body` | TEXT | HTML-текст статьи | "<b>Октябрь 2026</b>..." |
@@ -149,6 +155,7 @@ CREATE TABLE IF NOT EXISTS articles (
 | `published_at` | TEXT | ISO datetime публикации | "2026-10-13 08:52:15" |
 
 **Индексы:**
+
 ```sql
 CREATE INDEX idx_articles_status ON articles(status);
 CREATE INDEX idx_articles_created_at ON articles(created_at);
@@ -159,7 +166,7 @@ CREATE INDEX idx_articles_message_id ON articles(message_id);
 **Статусы статьи:**
 
 | Статус | Описание | Переход |
-|--------|----------|---------|
+| -------- | ---------- | --------- |
 | `pending` | На модерации у админа | → `approved`, `rejected`, `cancelled`, `published` |
 | `approved` | Одобрена админом, ждёт публикации | → `published` |
 | `published` | Опубликована в канале | (финальный) |
@@ -167,6 +174,7 @@ CREATE INDEX idx_articles_message_id ON articles(message_id);
 | `cancelled` | Отменена (кнопка ⛔) | (финальный) |
 
 **Правила:**
+
 - `regen_count` инкрементируется при каждой регенерации текста/картинки
 - `message_id` заполняется только после публикации
 - `published_at` заполняется только при `status='published'`
@@ -178,6 +186,7 @@ CREATE INDEX idx_articles_message_id ON articles(message_id);
 **Назначение:** Комментарии из группы-обсуждения канала для автомодерации.
 
 **Схема:**
+
 ```sql
 CREATE TABLE IF NOT EXISTS comments (
   id INTEGER PRIMARY KEY,
@@ -198,7 +207,7 @@ CREATE TABLE IF NOT EXISTS comments (
 **Поля:**
 
 | Поле | Тип | Описание | Пример |
-|------|-----|----------|--------|
+| ------ | ----- | ---------- | -------- |
 | `id` | INTEGER | PK, автоинкремент | 42 |
 | `chat_id` | INTEGER | Telegram chat_id группы | -1001234567890 |
 | `message_id` | INTEGER | ID сообщения в группе | 12345 |
@@ -212,6 +221,7 @@ CREATE TABLE IF NOT EXISTS comments (
 | `processed_at` | TEXT | ISO datetime обработки | "2026-10-13 16:00:05" |
 
 **Индексы:**
+
 ```sql
 CREATE INDEX idx_comments_status ON comments(status);
 CREATE INDEX idx_comments_processed_at ON comments(processed_at);
@@ -221,7 +231,7 @@ CREATE UNIQUE INDEX idx_comments_chat_message ON comments(chat_id, message_id);
 **Классификация комментариев:**
 
 | Класс | Действие | Пример |
-|-------|----------|--------|
+| ------- | ---------- | -------- |
 | `reklama` | Удаление | "КУПИ ДЕШЕВО +7999..." |
 | `toxic` | Удаление | "Вы все идиоты" |
 | `question` | AI-ответ | "Какие под-системы лучше?" |
@@ -229,6 +239,7 @@ CREATE UNIQUE INDEX idx_comments_chat_message ON comments(chat_id, message_id);
 | `positive` | Без ответа | "Спасибо!" |
 
 **Правила:**
+
 - `(chat_id, message_id)` — UNIQUE (один комментарий не сохраняется дважды)
 - `status='new'` → обрабатывается scheduler job `process_comments`
 - `classification` заполняется AI после обработки
@@ -240,6 +251,7 @@ CREATE UNIQUE INDEX idx_comments_chat_message ON comments(chat_id, message_id);
 **Назначение:** Логирование всех обращений к AI для статистики и бюджета.
 
 **Схема:**
+
 ```sql
 CREATE TABLE IF NOT EXISTS ai_logs (
   id INTEGER PRIMARY KEY,
@@ -256,7 +268,7 @@ CREATE TABLE IF NOT EXISTS ai_logs (
 **Поля:**
 
 | Поле | Тип | Описание | Пример |
-|------|-----|----------|--------|
+| ------ | ----- | ---------- | -------- |
 | `id` | INTEGER | PK, автоинкремент | 1234 |
 | `kind` | TEXT | Тип операции | "text" / "image" / "censor" |
 | `model` | TEXT | Модель AI | "gemini-3.1-flash-lite" / "imagen-3-fast" |
@@ -267,12 +279,14 @@ CREATE TABLE IF NOT EXISTS ai_logs (
 | `created_at` | TEXT | ISO datetime операции | "2026-10-13 08:47:25" |
 
 **Индексы:**
+
 ```sql
 CREATE INDEX idx_ai_logs_created_at ON ai_logs(created_at);
 CREATE INDEX idx_ai_logs_kind ON ai_logs(kind);
 ```
 
 **Расчёт стоимости:**
+
 ```python
 # Gemini Flash (текст)
 input_cost = (input_tokens / 1_000_000) * PRICE_TEXT_IN_USD_PER_1M
@@ -284,6 +298,7 @@ est_cost_usd = images * PRICE_IMAGE_USD
 ```
 
 **Правила:**
+
 - Токены оцениваются приблизительно (`len(text) / 4`)
 - Используется для команды `/stats` (бюджет AI)
 
@@ -294,6 +309,7 @@ est_cost_usd = images * PRICE_IMAGE_USD
 **Назначение:** Key-value настройки, редактируемые через бота или код.
 
 **Схема:**
+
 ```sql
 CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
@@ -305,7 +321,7 @@ CREATE TABLE IF NOT EXISTS settings (
 **Поля:**
 
 | Поле | Тип | Описание | Пример |
-|------|-----|----------|--------|
+| ------ | ----- | ---------- | -------- |
 | `key` | TEXT | PK, уникальный ключ | "morning_facts" |
 | `value` | TEXT | Значение (всегда строка) | "3" |
 | `updated_at` | TEXT | ISO datetime обновления | "2026-10-13 12:00:00" |
@@ -313,7 +329,7 @@ CREATE TABLE IF NOT EXISTS settings (
 **Ключи (используемые):**
 
 | Key | Type | Default | Описание | UI |
-|-----|------|---------|----------|-----|
+| ----- | ------ | --------- | ---------- | ----- |
 | `morning_facts` | int | 2 | Число фактов в утреннем посте (1-3) | `/setlen morning N` |
 | `evening_words` | int | 350 | Число слов в вечернем посте (200-500) | `/setlen evening N` |
 | `liked_feedback` | text | "" | Накопленные правила "что нравится админу" | Кнопка "💛 Правила нравится" |
@@ -323,6 +339,7 @@ CREATE TABLE IF NOT EXISTS settings (
 | `time_daily_evening` | int | null | Переопределённый час вечерней публикации | Кнопка "⏰ Время вечер" |
 
 **Правила:**
+
 - Все значения хранятся как TEXT (приведение типов в коде)
 - NULL value → используется default из config.py
 
@@ -333,6 +350,7 @@ CREATE TABLE IF NOT EXISTS settings (
 **Назначение:** Задания для автоматических Stories (опциональная фича).
 
 **Схема:**
+
 ```sql
 CREATE TABLE IF NOT EXISTS story_jobs (
   id INTEGER PRIMARY KEY,
@@ -354,7 +372,7 @@ CREATE TABLE IF NOT EXISTS story_jobs (
 **Поля:**
 
 | Поле | Тип | Описание | Пример |
-|------|-----|----------|--------|
+| ------ | ----- | ---------- | -------- |
 | `id` | INTEGER | PK, автоинкремент | 15 |
 | `target` | TEXT | Цель публикации | "channel" / "flood" |
 | `theme` | INTEGER | Номер темы (1-5) | 3 |
@@ -370,6 +388,7 @@ CREATE TABLE IF NOT EXISTS story_jobs (
 | `publish_at` | TEXT | Время публикации (планируемое) | "2026-10-13 12:00:00" |
 
 **Индексы:**
+
 ```sql
 CREATE INDEX idx_story_jobs_status ON story_jobs(status);
 CREATE INDEX idx_story_jobs_publish_at ON story_jobs(publish_at);
@@ -378,6 +397,7 @@ CREATE INDEX idx_story_jobs_publish_at ON story_jobs(publish_at);
 **Статус:** Аналогично `articles.status`
 
 **Правила:**
+
 - `message_id` — проставляется при отправке на модерацию (чтобы слот не пере-слался)
 - `story_msg_id` — заполняется после публикации
 
@@ -388,6 +408,7 @@ CREATE INDEX idx_story_jobs_publish_at ON story_jobs(publish_at);
 **Назначение:** Хранение состояния генеративного сериала (Saga). **Одна строка** (id=1).
 
 **Схема:**
+
 ```sql
 CREATE TABLE IF NOT EXISTS saga_state (
   id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -413,7 +434,7 @@ CREATE TABLE IF NOT EXISTS saga_state (
 **Поля:**
 
 | Поле | Тип | Описание | Пример |
-|------|-----|----------|--------|
+| ------ | ----- | ---------- | -------- |
 | `id` | INTEGER | PK, всегда 1 | 1 |
 | `episode_number` | INTEGER | Номер текущего эпизода (глобально) | 42 |
 | `arc_number` | INTEGER | Номер текущей арки | 3 |
@@ -433,6 +454,7 @@ CREATE TABLE IF NOT EXISTS saga_state (
 | `updated_at` | TEXT | ISO datetime обновления | "2026-10-13 20:00:00" |
 
 **Правила:**
+
 - **Ровно одна строка** (CHECK `id = 1`)
 - Обновляется после каждого эпизода саги
 - Используется для генерации следующего эпизода
@@ -444,6 +466,7 @@ CREATE TABLE IF NOT EXISTS saga_state (
 **Назначение:** Хроника всех эпизодов саги (краткое содержание).
 
 **Схема:**
+
 ```sql
 CREATE TABLE IF NOT EXISTS saga_summaries (
   id INTEGER PRIMARY KEY,
@@ -457,7 +480,7 @@ CREATE TABLE IF NOT EXISTS saga_summaries (
 **Поля:**
 
 | Поле | Тип | Описание | Пример |
-|------|-----|----------|--------|
+| ------ | ----- | ---------- | -------- |
 | `id` | INTEGER | PK, автоинкремент | 42 |
 | `episode_number` | INTEGER | Номер эпизода (глобально) | 42 |
 | `arc_number` | INTEGER | Номер арки | 3 |
@@ -465,12 +488,14 @@ CREATE TABLE IF NOT EXISTS saga_summaries (
 | `created_at` | TEXT | ISO datetime создания | "2026-10-13 20:00:00" |
 
 **Индексы:**
+
 ```sql
 CREATE INDEX idx_saga_summaries_episode ON saga_summaries(episode_number);
 CREATE INDEX idx_saga_summaries_arc ON saga_summaries(arc_number);
 ```
 
 **Правила:**
+
 - Одна запись на эпизод
 - Используется для "Previous on..." промпта
 
@@ -483,11 +508,13 @@ CREATE INDEX idx_saga_summaries_arc ON saga_summaries(arc_number);
 **Схема:** Создаётся автоматически APScheduler.
 
 **Поля:**
+
 - `id` — job ID (строка)
 - `next_run_time` — следующий запуск (timestamp)
 - `job_state` — сериализованный state (blob)
 
 **Правила:**
+
 - Не редактируется вручную
 - Используется scheduler.py
 
@@ -501,6 +528,7 @@ CREATE INDEX idx_saga_summaries_arc ON saga_summaries(arc_number);
 **Применение:** При первом запуске (`init_db()`)
 
 **Метод:**
+
 ```python
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
@@ -518,6 +546,7 @@ async def init_db():
 **Код:** `db/database.py:_migrate_saga()`
 
 **Таблица:**
+
 ```sql
 CREATE TABLE IF NOT EXISTS saga_posts (
   id INTEGER PRIMARY KEY,
@@ -539,6 +568,7 @@ CREATE TABLE IF NOT EXISTS saga_posts (
 **Код:** `db/database.py:_migrate_story_jobs()`
 
 **Изменение:**
+
 ```sql
 ALTER TABLE story_jobs ADD COLUMN message_id INTEGER;
 ```
@@ -581,6 +611,7 @@ CREATE INDEX idx_saga_summaries_arc ON saga_summaries(arc_number);
 ```
 
 **Обоснование:**
+
 - `status` — частые фильтры в WHERE
 - `created_at` — сортировка/фильтрация по дате
 - `(chat_id, message_id)` — UNIQUE constraint для комментариев
@@ -719,10 +750,12 @@ ANALYZE;
 **Статус:** Не включен (default: DELETE journal_mode)
 
 **Преимущества WAL:**
+
 - Concurrent reads during writes
 - Меньше fsync операций
 
 **Недостатки:**
+
 - 3 файла вместо 1 (`smoki.db`, `smoki.db-wal`, `smoki.db-shm`)
 - Сложнее backup
 
@@ -735,7 +768,7 @@ ANALYZE;
 ### 8.1. Известные лимиты
 
 | Лимит | Значение | Текущее использование |
-|-------|----------|----------------------|
+| ------- | ---------- | ---------------------- |
 | **Max DB size** | 281 TB | ~50MB (0.00002%) |
 | **Max row count** | 2^64 | ~10k (0.0000000001%) |
 | **Max table count** | ~1M | 9 таблиц |
@@ -761,6 +794,7 @@ ANALYZE;
 ## 9. Документация
 
 **См. также:**
+
 - [TRD.md](TRD.md) — технические требования
 - [DESIGN.md](DESIGN.md) — архитектура системы
 - [SPEC.md](SPEC.md) — спецификация для разработчиков

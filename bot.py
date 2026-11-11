@@ -71,7 +71,8 @@ async def main():
     from services import schedule_control
     await schedule_control.apply_persisted_pauses()
     logger.info("Планировщик активирован")
-    await bot.delete_webhook(drop_pending_updates=True)
+    # Keep queued updates across deploys and restarts; polling will process them.
+    await bot.delete_webhook(drop_pending_updates=False)
     await dp.start_polling(bot)
 
 

@@ -1,4 +1,5 @@
 # System Design Document (DESIGN)
+
 ## SMOKI-bot — Архитектура системы
 
 **Версия:** 1.0  
@@ -11,7 +12,7 @@
 
 ### 1.1. High-Level Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                        EXTERNAL SERVICES                         │
 ├─────────────────────────────────────────────────────────────────┤
@@ -63,6 +64,7 @@
 **Назначение:** Точка входа приложения, инициализация всех компонентов.
 
 **Основные функции:**
+
 - Инициализация aiogram Bot + Dispatcher
 - Регистрация handlers (admin, moderation, errors)
 - Запуск scheduler (APScheduler)
@@ -70,6 +72,7 @@
 - Graceful shutdown (закрытие aiohttp сессий)
 
 **Lifecycle:**
+
 ```python
 async def main():
     # 1. Init DB
@@ -95,6 +98,7 @@ async def main():
 ```
 
 **Зависимости:**
+
 - `config.py` — переменные окружения
 - `db/database.py` — инициализация БД
 - `handlers/` — обработчики команд и callback
@@ -110,6 +114,7 @@ async def main():
 **Назначение:** Панель управления для администратора.
 
 **Endpoints (команды):**
+
 ```python
 @router.message(Command("start"))        # Главная панель
 @router.message(Command("generate"))     # Ручная генерация
@@ -121,6 +126,7 @@ async def main():
 ```
 
 **Callbacks (кнопки):**
+
 ```python
 @router.callback_query(F.data == "adm_gen")      # Обычный пост
 @router.callback_query(F.data == "adm_gen_m")    # Утренний
@@ -135,6 +141,7 @@ async def main():
 ```
 
 **FSM States:**
+
 ```python
 class AdminStates(StatesGroup):
     waiting_custom_topic = State()    # Ждём ввода темы
@@ -143,6 +150,7 @@ class AdminStates(StatesGroup):
 ```
 
 **Безопасность:**
+
 - Проверка `message.from_user.id == ADMIN_CHAT_ID` на каждом endpoint
 - Неавторизованным пользователям: "У вас нет доступа. Ваш ID: {user_id}"
 
@@ -153,6 +161,7 @@ class AdminStates(StatesGroup):
 **Назначение:** Обработка модерации черновиков (5 кнопок).
 
 **Callbacks:**
+
 ```python
 @router.callback_query(F.data.startswith("pub:"))       # ✅ Опубликовать
 @router.callback_query(F.data.startswith("regen_text:")) # 🔄 Регенерировать текст
@@ -162,6 +171,7 @@ class AdminStates(StatesGroup):
 ```
 
 **Бизнес-логика:**
+
 1. **Опубликовать:**
    - Вызов `services.publisher.publish_article(article_id)`
    - Обновление статуса: `pending` → `published`
@@ -184,6 +194,7 @@ class AdminStates(StatesGroup):
    - Сообщение: "Черновик #N отменён"
 
 **Лимиты:**
+
 - Максимум 10 регенераций на пост
 - После 10 попыток: "Достигнут лимит попыток"
 
@@ -194,6 +205,7 @@ class AdminStates(StatesGroup):
 **Назначение:** Глобальная обработка ошибок.
 
 **Типы ошибок:**
+
 ```python
 @router.error()
 async def error_handler(event: ErrorEvent):
@@ -220,6 +232,7 @@ async def error_handler(event: ErrorEvent):
 **Назначение:** Генерация статей (текст + картинка + автоцензура).
 
 **Главная функция:**
+
 ```python
 async def generate_article(
     topic: str | None = None,
@@ -241,7 +254,8 @@ async def generate_article(
 ```
 
 **Pipeline (8 шагов):**
-```
+
+```text
 1. Генерация темы (если не задана)
    ├─> generate_topic() → topic
    └─> Проверка дублей (published_topics)
@@ -283,6 +297,7 @@ async def generate_article(
 ```
 
 **Fallback логика:**
+
 - Hybrid search: Serper API → Google grounding
 - Gemini: Vertex AI → AI Studio key
 - Imagen: primary client → fallback client
@@ -294,6 +309,7 @@ async def generate_article(
 **Назначение:** Автоцензура статей перед публикацией.
 
 **Функция:**
+
 ```python
 async def censor(body: str) -> tuple[bool, str]:
     """
@@ -307,6 +323,7 @@ async def censor(body: str) -> tuple[bool, str]:
 ```
 
 **Правила проверки:**
+
 ```python
 CENSOR_RULES = """
 ЗАПРЕЩЕНО:
@@ -323,6 +340,7 @@ CENSOR_RULES = """
 ```
 
 **Промпт:**
+
 ```python
 def censor_prompt(body: str, extra_rules: str) -> str:
     return f"""
@@ -343,6 +361,7 @@ def censor_prompt(body: str, extra_rules: str) -> str:
 ```
 
 **Логирование:**
+
 - Каждая проверка логируется в `ai_logs` (kind='censor')
 - Накопленные замечания → `settings.censor_extra`
 
@@ -353,6 +372,7 @@ def censor_prompt(body: str, extra_rules: str) -> str:
 **Назначение:** Публикация статей в канал.
 
 **Функция:**
+
 ```python
 async def publish_article(article_id: int) -> dict:
     """
@@ -366,6 +386,7 @@ async def publish_article(article_id: int) -> dict:
 ```
 
 **Логика разбивки:**
+
 ```python
 if len(body) <= 1024:
     # Короткий текст → caption к картинке
@@ -390,6 +411,7 @@ else:
 ```
 
 **Обновление БД:**
+
 ```python
 await db.update_article(
     article_id,
@@ -407,6 +429,7 @@ await db.update_topic(topic_id, status="published")
 **Назначение:** Автоматическая модерация комментариев.
 
 **Главная функция:**
+
 ```python
 async def process_new_comments() -> dict:
     """
@@ -423,7 +446,8 @@ async def process_new_comments() -> dict:
 ```
 
 **Pipeline:**
-```
+
+```text
 1. Получить новые комментарии (status='new' из БД)
 
 2. Классификация (для каждого комментария)
@@ -441,6 +465,7 @@ async def process_new_comments() -> dict:
 ```
 
 **Промпт классификации:**
+
 ```python
 def classify_comment(text: str) -> str:
     prompt = f"""
@@ -469,6 +494,7 @@ def classify_comment(text: str) -> str:
 **Назначение:** Обёртка над Google Gemini API (текст + изображения).
 
 **Два клиента:**
+
 ```python
 # Primary: Vertex AI (Workload Identity)
 client = genai.Client(
@@ -484,6 +510,7 @@ fallback_client = genai.Client(
 ```
 
 **Функции:**
+
 ```python
 def generate_text(
     prompt: str,
@@ -512,6 +539,7 @@ def generate_image(
 ```
 
 **Автопереключение:**
+
 ```python
 for client in [primary_client, fallback_client]:
     try:
@@ -526,6 +554,7 @@ raise RuntimeError("All clients failed")
 ```
 
 **Safety settings:**
+
 ```python
 safety_settings = {
     HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
@@ -540,6 +569,7 @@ safety_settings = {
 **Назначение:** Поиск новостей через Serper News API.
 
 **Главная функция:**
+
 ```python
 async def search_news(
     query: str,
@@ -555,6 +585,7 @@ async def search_news(
 ```
 
 **NewsItem структура:**
+
 ```python
 class NewsItem(TypedDict):
     title: str
@@ -566,6 +597,7 @@ class NewsItem(TypedDict):
 ```
 
 **HTTP клиент:**
+
 ```python
 _session: aiohttp.ClientSession | None = None
 
@@ -585,6 +617,7 @@ async def close_session():
 ```
 
 **Форматирование для промпта:**
+
 ```python
 def format_news_context(news: list[NewsItem]) -> str:
     """
@@ -609,6 +642,7 @@ def format_news_context(news: list[NewsItem]) -> str:
 **Назначение:** Async обёртка над SQLite через aiosqlite.
 
 **Инициализация:**
+
 ```python
 async def init_db():
     """
@@ -619,6 +653,7 @@ async def init_db():
 ```
 
 **CRUD операции:**
+
 ```python
 # Topics
 async def save_topic(title, category, status) -> int
@@ -649,6 +684,7 @@ async def get_stats() -> dict
 ```
 
 **Connection pooling:**
+
 ```python
 # Каждая функция открывает свой connection:
 async with aiosqlite.connect(DB_PATH) as db:
@@ -667,6 +703,7 @@ async with aiosqlite.connect(DB_PATH) as db:
 **Таблицы:** См. [DB.md](DB.md) для полной схемы.
 
 **Ключевые индексы:**
+
 ```sql
 CREATE INDEX idx_articles_status ON articles(status);
 CREATE INDEX idx_articles_created_at ON articles(created_at);
@@ -681,6 +718,7 @@ CREATE INDEX idx_comments_processed_at ON comments(processed_at);
 **Назначение:** Расписание автоматических задач (APScheduler).
 
 **Jobstore:**
+
 ```python
 jobstores = {
     'default': SQLAlchemyJobStore(url=f'sqlite:///{DB_PATH}')
@@ -689,6 +727,7 @@ jobstores = {
 ```
 
 **Задачи:**
+
 ```python
 # 1. Утренний пост
 scheduler.add_job(
@@ -737,6 +776,7 @@ scheduler.add_job(_job_send_pending_stories, ...)
 ```
 
 **Управление задачами:**
+
 ```python
 # Пауза (через настройки БД)
 paused_jobs = await db.get_setting('paused_jobs', '')  # CSV: "daily_morning,daily_evening"
@@ -755,7 +795,7 @@ if custom_hour:
 
 ### 3.1. Генерация утреннего поста
 
-```
+```text
 [Scheduler: 08:XX MSK]
          │
          v
@@ -818,7 +858,7 @@ if custom_hour:
 
 ### 3.2. Автопубликация по дедлайну
 
-```
+```text
 [Scheduler: 10:00 MSK]
          │
          v
@@ -850,7 +890,7 @@ if custom_hour:
 
 ### 3.3. Модерация комментариев
 
-```
+```text
 [Scheduler: каждые 6 часов]
          │
          v
@@ -893,16 +933,19 @@ if custom_hour:
 ### 4.1. Authentication & Authorization
 
 **Telegram Bot:**
+
 - BOT_TOKEN: секрет в `.env`, не коммитится
 - ADMIN_CHAT_ID: whitelist администратора
 - Все admin-команды проверяют `user.id == ADMIN_CHAT_ID`
 
 **Google Cloud:**
+
 - Workload Identity: service account без JSON-ключей
 - Minimal IAM роль: `roles/aiplatform.user`
 - Fallback: AI Studio API key в `.env`
 
 **Serper API:**
+
 - SERPER_API_KEY: опциональный, в `.env`
 - Fallback: Google grounding при отсутствии
 
@@ -911,6 +954,7 @@ if custom_hour:
 ### 4.2. Data Protection
 
 **Secrets:**
+
 ```bash
 # .env (600 permissions, не в git)
 BOT_TOKEN=...
@@ -920,11 +964,13 @@ GEMINI_API_KEY_FALLBACK=...
 ```
 
 **Database:**
+
 - SQLite файл: `data/smoki.db` (600 permissions)
 - Backup: ежедневный snapshot (GCP), retention 30 дней
 - Нет персональных данных подписчиков (только comments от публичной группы)
 
 **Logs:**
+
 - Нет секретов в логах
 - API ключи маскируются: `SERPER_API_KEY=***...***`
 
@@ -933,11 +979,13 @@ GEMINI_API_KEY_FALLBACK=...
 ### 4.3. Content Safety
 
 **Автоцензура:**
+
 - 100% статей проходят проверку перед публикацией
 - Запрещённые формулировки → регенерация (до 3 раз)
 - Логирование всех нарушений
 
 **Imagen safety filter:**
+
 ```python
 safety_settings = {
     HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE
@@ -945,6 +993,7 @@ safety_settings = {
 ```
 
 **Модерация комментариев:**
+
 - Спам/токсичность удаляется в течение 0-6 часов
 - AI-классификация без false positives (вручную проверено)
 
@@ -955,7 +1004,7 @@ safety_settings = {
 ### 5.1. Текущие лимиты
 
 | Ресурс | Лимит | Текущее использование | Запас |
-|--------|-------|-----------------------|-------|
+| -------- | ------- | ----------------------- | ------- |
 | **SQLite writes** | ~50k/день | ~10 записей/день | 5000x |
 | **Telegram API** | 30 msg/сек | <1 msg/мин | 1800x |
 | **Gemini API** | 60 req/мин | <1 req/мин | 60x |
@@ -968,19 +1017,23 @@ safety_settings = {
 
 ### 5.2. Bottlenecks (при 100x росте)
 
-**Проблема 1: SQLite concurrent writes**
+#### Проблема 1: SQLite concurrent writes
+
 - Симптом: SQLITE_BUSY errors при >100 записей/сек
 - Решение: PostgreSQL migration
 
-**Проблема 2: Telegram rate limits**
+#### Проблема 2: Telegram rate limits
+
 - Симптом: TelegramRetryAfter при >30 msg/сек в канал
 - Решение: Message queue (Celery + Redis)
 
-**Проблема 3: Gemini rate limits**
+#### Проблема 3: Gemini rate limits
+
 - Симптом: HTTP 429 при >60 req/мин
 - Решение: Request throttling (aiogram middleware)
 
-**Проблема 4: Single-process scheduler**
+#### Проблема 4: Single-process scheduler
+
 - Симптом: Задачи пропускаются при высокой нагрузке
 - Решение: Distributed scheduler (Celery Beat)
 
@@ -991,7 +1044,8 @@ safety_settings = {
 ### 6.1. Heartbeat System
 
 **Компоненты:**
-```
+
+```text
 [APScheduler: heartbeat job]
          ↓ каждые 4 часа
 [scheduler.py: _job_heartbeat()]
@@ -1011,6 +1065,7 @@ journalctl -u smoki-bot --since "8 hours ago" | grep "HEARTBEAT ok"
 ```
 
 **Параметры:**
+
 - `HEARTBEAT_INTERVAL_HOURS=4` — частота записи
 - `HEARTBEAT_MAX_AGE_HOURS=8` — порог тревоги
 
@@ -1023,6 +1078,7 @@ journalctl -u smoki-bot --since "8 hours ago" | grep "HEARTBEAT ok"
 **Trigger:** `PUBLISH_WINDOW_END + 2 часа` (например, 12:00 MSK)
 
 **Логика:**
+
 ```python
 async def _job_delivery_watchdog():
     undelivered = await db.get_undelivered_today()
@@ -1035,11 +1091,13 @@ async def _job_delivery_watchdog():
 ### 6.3. AI Budget Monitoring
 
 **Метрики:**
+
 - `ai_logs` таблица: все вызовы AI с токенами и расходом
 - Команда `/stats`: сводка за месяц
 - Alert: если расход > `MONTHLY_BUDGET_USD`
 
 **Прогноз:**
+
 ```python
 days_passed = datetime.now().day
 days_in_month = 30
@@ -1057,11 +1115,13 @@ if projected_spend > MONTHLY_BUDGET_USD:
 ### 7.1. Backup Strategy
 
 **Автоматический backup:**
+
 - Systemd service: `smoki-backup.service`
 - Trigger: ежедневно в 03:00 UTC
 - Retention: 30 дней
 
 **Что бэкапится:**
+
 ```bash
 tar -czf backup_$(date +%Y%m%d).tar.gz \
     data/smoki.db \
@@ -1070,6 +1130,7 @@ tar -czf backup_$(date +%Y%m%d).tar.gz \
 ```
 
 **Хранение:**
+
 - Локально: `/opt/SMOKI/backups/`
 - Remote: GCP Storage Bucket (опционально)
 
@@ -1077,7 +1138,8 @@ tar -czf backup_$(date +%Y%m%d).tar.gz \
 
 ### 7.2. Recovery Procedures
 
-**Сценарий 1: Потеря БД**
+#### Сценарий 1: Потеря БД
+
 ```bash
 # 1. Остановить бота
 sudo systemctl stop smoki-bot
@@ -1095,7 +1157,8 @@ sudo systemctl start smoki-bot
 
 ---
 
-**Сценарий 2: Потеря instance (GCP)**
+#### Сценарий 2: Потеря instance (GCP)
+
 ```bash
 # 1. Создать новый instance из snapshot
 gcloud compute disks create new-disk --source-snapshot=snapshot-20261012
@@ -1115,6 +1178,7 @@ gcloud compute instances start telegram-bot-new
 ## 8. Документация
 
 **См. также:**
+
 - [PRD.md](PRD.md) — продуктовые требования
 - [TRD.md](TRD.md) — технические требования
 - [FLOW.md](FLOW.md) — пользовательские сценарии

@@ -20,6 +20,7 @@ tools: types.ToolListUnion | None = (
 ```
 
 **Где применяется:**
+
 - `services/content.py:193` — генерация статей (всегда `use_search=True`)
 - `services/stories.py:94-156` — Stories (для тем: новости, технологии, история)
 
@@ -47,6 +48,7 @@ tools: types.ToolListUnion | None = (
 Google Search API с низкой задержкой и структурированными результатами.
 
 **Ключевые возможности:**
+
 - News Search endpoint — специализированный поиск новостей
 - Актуальность: результаты за последние 24 часа
 - Метаданные: дата публикации, источник, thumbnail
@@ -60,6 +62,7 @@ Google Search API с низкой задержкой и структуриров
 - **Ultra:** $225/месяц за 30,000 поисков ($0.0075/запрос)
 
 **Текущая нагрузка проекта:**
+
 - 2 статьи/день × 30 дней = 60 запросов/месяц
 - Stories (замороженo) = 0 запросов
 - **Итого:** ~60-100 запросов/месяц → Free tier достаточно
@@ -145,6 +148,7 @@ async def generate_article_with_serper(topic: str) -> dict:
 **Vercel AI SDK** — TypeScript/JavaScript библиотека для AI-приложений.
 
 **Важно:** Это не сервис для поиска новостей, а инструмент для:
+
 - Унификации вызовов к разным LLM (OpenAI, Anthropic, Google, etc.)
 - Streaming ответов
 - Tool calling / function calling
@@ -153,6 +157,7 @@ async def generate_article_with_serper(topic: str) -> dict:
 ### Применимость к проекту
 
 ❌ **Не подходит** для текущей задачи:
+
 1. Проект на Python (Vercel AI SDK — TypeScript/JS)
 2. Нет функционала поиска новостей (только обёртка над LLM)
 3. Vercel Functions — для деплоя веб-приложений, не для Telegram ботов
@@ -168,6 +173,7 @@ async def generate_article_with_serper(topic: str) -> dict:
 Комбинирование Google Search grounding + явный новостный поиск.
 
 **Идея:**
+
 1. Для **общих тем** — Google Search grounding (как сейчас)
 2. Для **новостных тем** — Serper News API с метаданными
 3. Для **технических тем** — Serper обычный поиск + GitHub Issues (через Kindly Web Search)
@@ -226,7 +232,8 @@ async def generate_article(topic: str, ...) -> dict:
 **Рекомендация:** Протестировать Serper API на новостных темах
 
 **План:**
-1. Регистрация на https://serper.dev (free tier)
+
+1. Регистрация на <https://serper.dev> (free tier)
 2. Добавить `SERPER_API_KEY` в `.env`
 3. Создать модуль `ai/search.py` с функциями Serper
 4. Реализовать `_smart_search_context()` в `services/content.py`
@@ -244,11 +251,13 @@ async def generate_article(topic: str, ...) -> dict:
 **Рекомендация:** Hybrid search для разных типов контента
 
 **Сценарии:**
+
 - **Новости** → Serper News API (свежесть + источники)
 - **Общие темы** → Google Search grounding (широкий охват)
 - **Технические** → Kindly Web Search MCP (GitHub Issues, StackOverflow)
 
 **Преимущества:**
+
 - Лучшее качество для каждого типа контента
 - Контроль над источниками
 - Снижение стоимости grounding
@@ -258,12 +267,14 @@ async def generate_article(topic: str, ...) -> dict:
 **Рекомендация:** RAG (Retrieval-Augmented Generation) с кэшированием
 
 **Идея:**
+
 1. Собственная база новостей по нише (вейпы, кальяны)
 2. RSS-агрегация из проверенных источников
 3. Векторный поиск (embedding) по базе
 4. Генерация на основе своих данных + Serper для свежих событий
 
 **Преимущества:**
+
 - Независимость от внешних API
 - Контроль качества источников
 - Нулевая стоимость поиска (кроме хранения)
@@ -273,7 +284,7 @@ async def generate_article(topic: str, ...) -> dict:
 ## Сравнительная таблица
 
 | Критерий | Google Search grounding | Serper API | Vercel AI |
-|----------|-------------------------|------------|-----------|
+| ---------- | ------------------------- | ------------ | ----------- |
 | **Актуальность новостей** | ⭐⭐⭐ (нет контроля) | ⭐⭐⭐⭐⭐ (фильтр по дате) | ❌ (нет поиска) |
 | **Стоимость (текущая нагрузка)** | ~$5-10/мес (GCP traffic) | $0 (free tier) | N/A |
 | **Прозрачность источников** | ❌ (черный ящик) | ✅ (видим всё) | N/A |
@@ -299,7 +310,7 @@ async def generate_article(topic: str, ...) -> dict:
    - Общие темы → Google Search grounding (текущее решение)
    - Постепенная миграция с A/B тестированием
 
-4. **Первый шаг:** 
+4. **Первый шаг:**
    - Зарегистрироваться на Serper.dev
    - Реализовать `ai/search.py` с News API
    - Протестировать на 5-10 новостных темах

@@ -17,7 +17,7 @@ from ai import search as ai_search
 logger = logging.getLogger("smoki.content_suggestions")
 
 # RSS-ленты тематических сайтов (примеры, можно расширять)
-RSS_FEEDS = [
+RSS_FEEDS: List[str] = [
     # Добавить реальные RSS при наличии
     # "https://vape.ru/rss",
     # "https://hookahrussia.ru/feed",

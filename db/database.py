@@ -1,4 +1,6 @@
 import hashlib
+from datetime import datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo
 import aiosqlite
 import config
 
@@ -121,16 +123,26 @@ async def get_latest_pending_article() -> dict | None:
 async def get_undelivered_today() -> list[dict]:
     """Статьи, созданные сегодня, но НЕ опубликованные (для watchdog доставки).
 
-    Возвращает статьи в статусе pending/approved с created_at за текущую дату.
+    Возвращает pending/approved за текущий московский день планировщика.
+    created_at хранится в UTC; часовой пояс ОС не влияет на выборку.
     Пустой список = всё доставлено (или контента дня ещё не было).
     """
+    moscow = ZoneInfo("Europe/Moscow")
+    today = datetime.now(moscow).date()
+    start = datetime.combine(today, time.min, tzinfo=moscow)
+    end = datetime.combine(today + timedelta(days=1), time.min, tzinfo=moscow)
+    bounds = tuple(
+        value.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        for value in (start, end)
+    )
     async with aiosqlite.connect(config.DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             "SELECT * FROM articles "
             "WHERE status IN ('pending', 'approved') "
-            "AND date(created_at) = date('now', 'localtime') "
-            "ORDER BY id ASC"
+            "AND created_at >= ? AND created_at < ? "
+            "ORDER BY id ASC",
+            bounds,
         )
         rows = await cur.fetchall()
         return [dict(r) for r in rows]

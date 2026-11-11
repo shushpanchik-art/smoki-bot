@@ -6,6 +6,7 @@
 | db/database.py, db/schema.sql | test_db, test_schema, test_integrity, test_sql_valid |
 | config.py, .env.example | test_config, test_env_example, test_secrets |
 | ai/gemini.py | test_gemini |
+| ai/sentiment.py | test_sentiment, test_gemini |
 | ai/prompts.py | test_prompts, test_image_scene, test_story_prompts |
 | saga (prompts/service) | test_saga_prompt, test_saga_service |
 | services/content.py | test_content, test_admin_custom_length, test_u4_custom_length |

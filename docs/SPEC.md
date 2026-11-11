@@ -9,6 +9,7 @@
 ## Быстрый старт
 
 **См. подробную документацию:**
+
 - [PRD.md](PRD.md) — что делает продукт и зачем
 - [TRD.md](TRD.md) — технические требования
 - [FLOW.md](FLOW.md) — пользовательские сценарии
@@ -28,6 +29,7 @@
 **Проект:** `project-dfb3fb77-77cb-4e79-bbb`
 
 **Пути:**
+
 - Код: `/opt/SMOKI/bot`
 - Venv: `/opt/SMOKI/bot/venv`
 - БД: `/opt/SMOKI/bot/data/smoki.db`
@@ -35,6 +37,7 @@
 - Логи: `journalctl -u smoki-bot`
 
 **Systemd service:**
+
 ```bash
 sudo systemctl status smoki-bot
 sudo systemctl restart smoki-bot
@@ -42,6 +45,7 @@ journalctl -u smoki-bot -n 50 --no-pager
 ```
 
 **Systemd timers:**
+
 - `smoki-backup.timer` — ежедневный backup БД + images
 - `smoki-heartbeat.timer` — проверка живости бота (каждый час)
 - `smoki-backup-summary.timer` — ежедневная сводка бэкапов (23:45 MSK)
@@ -53,7 +57,7 @@ journalctl -u smoki-bot -n 50 --no-pager
 ### 1.2. Stack
 
 | Компонент | Версия |
-|-----------|--------|
+| ----------- | -------- |
 | Python | 3.11.2 |
 | aiogram | 3.30.0 |
 | aiosqlite | 0.22.1 |
@@ -81,10 +85,12 @@ gcloud compute ssh telegram-bot --project=project-dfb3fb77-77cb-4e79-bbb --zone=
 ```
 
 **Пользователи:**
+
 - `artemijvisnevskij` — рабочий пользователь (sudo access)
 - `shushpanchik_art` — владелец файлов проекта (без прямого SSH)
 
 **Работа с проектом:**
+
 ```bash
 # Switch to project owner
 sudo -u shushpanchik_art -s
@@ -101,11 +107,13 @@ source venv/bin/activate
 **Решение:** Всегда использовать `gcloud compute ssh` с полными параметрами.
 
 **Шаблон команды:**
+
 ```bash
 gcloud compute ssh telegram-bot --zone=us-central1-c --project=project-dfb3fb77-77cb-4e79-bbb --command="КОМАНДА"
 ```
 
 **Работа от имени shushpanchik_art:**
+
 ```bash
 gcloud compute ssh telegram-bot --zone=us-central1-c --project=project-dfb3fb77-77cb-4e79-bbb \
   --command="sudo -u shushpanchik_art bash -c 'cd /opt/SMOKI/bot && source venv/bin/activate && КОМАНДА'"
@@ -141,6 +149,7 @@ gcloud compute ssh telegram-bot --zone=us-central1-c --project=project-dfb3fb77-
 
 1. **Экранирование кавычек:** В Python-коде внутри heredoc используйте `\"` для двойных кавычек
 2. **F-strings:** Избегайте вложенных f-string с кавычками — используйте `.format()` или конкатенацию:
+
    ```python
    # WRONG (синтаксис ломается)
    print(f"Text: {dict['key']}")
@@ -149,6 +158,7 @@ gcloud compute ssh telegram-bot --zone=us-central1-c --project=project-dfb3fb77-
    print("Text:", dict['key'])
    print("Text: {}".format(dict['key']))
    ```
+
 3. **Timeout:** Для долгих операций добавьте `--timeout=120000` (120 сек)
 4. **Закрытие сессий:** Всегда вызывайте `await close_session()` из `ai.search` после Serper API
 
@@ -216,6 +226,7 @@ pytest tests/test_content.py -v
 ```
 
 **Smoke tests** (ручная проверка):
+
 ```bash
 # Генерация статьи
 python3 -c "
@@ -260,16 +271,19 @@ asyncio.run(test())
 **Проблема:** Множественные пустые строки подряд.
 
 **Правила:**
+
 - Максимум 1 пустая строка подряд
 - Убирать trailing spaces
 - Файл заканчивается одним `\n`
 
 **Быстрый фикс:**
+
 ```bash
 python3 -c "import re,sys;p=sys.argv[1];s=open(p).read();open(p,'w').write(re.sub(r'\n{3,}','\n\n',s).rstrip(chr(10))+chr(10))" FILE.md
 ```
 
 **Локальная проверка (если установлен node):**
+
 ```bash
 npx markdownlint-cli2 "**/*.md"
 ```
@@ -310,6 +324,7 @@ journalctl -u smoki-bot -f -n 50
 ### 5.1. Environment Variables
 
 **Критичные (обязательны):**
+
 ```bash
 # Telegram
 BOT_TOKEN=<bot-token>
@@ -322,6 +337,7 @@ GOOGLE_CLOUD_LOCATION=global
 ```
 
 **Опциональные:**
+
 ```bash
 # Serper API (fallback на Google grounding)
 SERPER_API_KEY=
@@ -338,6 +354,7 @@ PUBLISH_WINDOW_END=10
 **Полный список:** см. `.env.example` (51 переменная)
 
 **Проверка на сервере:**
+
 ```bash
 sudo grep -E '^(GOOGLE_CLOUD_PROJECT|GOOGLE_CLOUD_LOCATION|SERPER_API_KEY)=' /opt/SMOKI/bot/.env
 ```
@@ -371,7 +388,7 @@ time_daily_evening -- переопределённый час вечерней �
 
 **См. детально:** [DESIGN.md](DESIGN.md)
 
-```
+```text
 bot.py (entry point)
 ├── handlers/ (команды и callback)
 │   ├── admin.py (админ-панель)
@@ -393,7 +410,8 @@ bot.py (entry point)
 ```
 
 **Data flow (генерация утреннего поста):**
-```
+
+```text
 Scheduler (08:XX) → generate_article() → Serper News API (если новостная тема)
 → Gemini (текст) → Censor (проверка) → Gemini (картинка) → save to DB
 → send_for_moderation() → Админ нажимает ✅ → publish_article() → Канал
@@ -409,11 +427,13 @@ Scheduler (08:XX) → generate_article() → Serper News API (если ново�
 **Fallback:** AI Studio (API key в `.env`)
 
 **Модели:**
+
 - `gemini-3.1-flash-lite` — генерация текста (primary)
 - `gemini-1.5-flash-002` — fallback model
 - `imagen-3.0-fast-generate-001` — генерация картинок
 
 **Features:**
+
 - Google Search grounding (`use_search=True`)
 - Safety settings (medium threshold)
 - JSON mode (structured output)
@@ -425,6 +445,7 @@ Scheduler (08:XX) → generate_article() → Serper News API (если ново�
 **Endpoint:** `https://google.serper.dev/news`
 
 **Использование:**
+
 - Новостные темы (ключевые слова: `новост*`, `событи*`, `заявил*`, `запрет*`, `закон*`)
 - Последние 7 дней
 - Извлечение `imageUrl` для картинок новостей
@@ -438,23 +459,27 @@ Scheduler (08:XX) → generate_article() → Serper News API (если ново�
 ## 8. Контент-план
 
 **Утро (08:00-10:00 MSK):**
+
 - 1-3 факта (настраивается)
 - Обязательная короткая шутка в конце
 - 100-150 слов (строго)
 - Картинка (AI-генерация или из Serper imageUrl)
 
 **Вечер (19:00-20:30 MSK):**
+
 - Лонг-рид 200-500 слов (настраивается)
 - Глубокая проработка темы
 - Картинка (AI-генерация или из Serper imageUrl)
 - Возможность Saga-эпизода (если `SAGA_ENABLED=1`)
 
 **Модерация:**
+
 - Черновик отправляется админу в ЛС
 - 5 кнопок: ✅ Опубликовать / 🔄 Регенерировать текст / 🖼 Регенерировать картинку / 📝 Редактировать / ⛔ Отмена
 - Автопубликация по дедлайну (10:00 и 20:30) если не промодерировано
 
 **Автоцензура:**
+
 - ❌ Призыв к покупке и курению
 - ❌ Медицинские советы
 - ❌ Утверждения о пользе курения
@@ -501,20 +526,23 @@ journalctl -u smoki-bot -f
 ### 9.3. API ошибки (Gemini/Serper)
 
 **Gemini HTTP 503:**
-```
+
+```text
 Symptom: "google.api_core.exceptions.ServiceUnavailable"
 Cause: Vertex AI недоступен
 Fix: Автоматический fallback на AI Studio key
 ```
 
 **Serper HTTP 429:**
-```
+
+```text
 Symptom: "Serper API ошибка (fallback на grounding)"
 Cause: Rate limit exceeded (2500 req/мес)
 Fix: Автоматический fallback на Google grounding
 ```
 
 **Проверка fallback:**
+
 ```bash
 journalctl -u smoki-bot | grep -E "резервный ключ|fallback" | tail -10
 ```
@@ -523,7 +551,7 @@ journalctl -u smoki-bot | grep -E "резервный ключ|fallback" | tail 
 
 ### 9.4. База данных заблокирована
 
-```
+```text
 Symptom: sqlite3.OperationalError: database is locked
 Cause: Concurrent write (редко при SQLite)
 Fix: Restart бота (pending writes завершатся)
@@ -538,11 +566,13 @@ Fix: Restart бота (pending writes завершатся)
 ### 10.1. Heartbeat
 
 **Как работает:**
+
 1. APScheduler job пишет "HEARTBEAT ok" каждые 4 часа
 2. Systemd timer проверяет журнал каждый час
 3. Если нет heartbeat >8 часов → алерт админу в Telegram
 
 **Проверка:**
+
 ```bash
 # Последний heartbeat
 journalctl -u smoki-bot | grep HEARTBEAT | tail -1
@@ -558,7 +588,8 @@ systemctl status smoki-heartbeat.timer
 **Команда:** `/stats` в боте
 
 **Результат:**
-```
+
+```text
 📊 Статистика AI (октябрь 2026)
 
 Текст: 1,234,567 токенов ($0.12)
@@ -576,12 +607,14 @@ systemctl status smoki-heartbeat.timer
 ### 10.3. Backup
 
 **Автоматический:**
+
 - Ежедневно в 03:00 UTC (06:00 MSK)
 - Retention: 30 дней
 - Содержимое: `data/smoki.db` + `data/images/`
 - Проверка: systemd timer отправляет сводку админу (23:45 MSK)
 
 **Ручной:**
+
 ```bash
 # Trigger backup
 sudo systemctl start smoki-backup.service
@@ -591,6 +624,7 @@ journalctl -u smoki-backup.service -n 50 --no-pager | grep -E "backup ok|stats:"
 ```
 
 **Restore:**
+
 ```bash
 # 1. Stop bot
 sudo systemctl stop smoki-bot
@@ -608,11 +642,13 @@ sudo systemctl start smoki-bot
 ## 11. Known Issues
 
 **ISSUE-001: Длинные новостные посты без imageUrl**  
+
 - Частота: <5%
 - Workaround: AI-генерация картинки
 - Статус: Won't fix
 
 **ISSUE-002: Saga теряет контекст между эпизодами**  
+
 - Частота: ~10%
 - Workaround: Ручная корректировка `saga_state.recap`
 - Статус: Known limitation (LLM context window)
@@ -622,6 +658,7 @@ sudo systemctl start smoki-bot
 ## 12. Документация
 
 **Навигация:**
+
 - [PRD.md](PRD.md) — продуктовые требования (что и зачем)
 - [TRD.md](TRD.md) — технические требования (как реализовано)
 - [FLOW.md](FLOW.md) — пользовательские сценарии
@@ -640,6 +677,7 @@ sudo systemctl start smoki-bot
 **Лицензия:** Proprietary
 
 **Изменения от 1.0:**
+
 - Разделение документации на специализированные файлы
 - Фокус SPEC.md на практических аспектах для разработчика
 - Удаление дублирования (детали в PRD/TRD/DESIGN/DB)

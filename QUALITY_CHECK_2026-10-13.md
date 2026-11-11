@@ -16,7 +16,7 @@
 - `.pytest_cache/` — 32 KB
 - `.mypy_cache/` — 13 MB
 - `.ruff_cache/` — 36 KB
-- Временные файлы (*.pyc, *.pyo, .DS_Store) — 401 файл
+- Временные файлы (`*.pyc`, `*.pyo`, `.DS_Store`) — 401 файл
 
 ### Результат
 
@@ -37,11 +37,13 @@
 **Причина:** Устранение DeprecationWarning в Python 3.14 (разработка)
 
 **Проверка совместимости:**
+
 - ✅ Требует Python >=3.10 (продакшн: 3.11.2)
 - ✅ Все 223 теста пройдены
 - ✅ Coverage 54.23% (без изменений)
 
 **Изменения:**
+
 - `requirements.txt`: обновлена версия библиотеки
 - `pytest.ini`: добавлен фильтр для подавления внешних DeprecationWarning
 
@@ -52,12 +54,14 @@
 ### DeprecationWarning в google-genai
 
 **Проблема:**
-```
+
+```text
 /site-packages/google/genai/types.py:42: DeprecationWarning: 
 '_UnionGenericAlias' is deprecated and slated for removal in Python 3.17
 ```
 
 **Решение:**
+
 1. Обновлена библиотека до 2.30.0
 2. Добавлен pytest фильтр (предупреждение из внешней библиотеки, не из кода проекта)
 3. На продакшн (Python 3.11.2) предупреждение не возникает
@@ -69,9 +73,11 @@
 ## 4. Проверка GitHub
 
 ### Открытые issues: 0
+
 ### Открытые PR: 0
 
 **Последние закрытые:**
+
 - #198 (actualization docs) — 13 октября 2026
 - #205 (error) — 13 октября 2026
 
@@ -86,11 +92,13 @@
 ```bash
 ruff check . --exclude venv,data,__pycache__
 ```
+
 ✅ Без ошибок
 
 ```bash
 mypy bot.py config.py db/ ai/ services/ handlers/ scheduler.py
 ```
+
 ✅ Успешно (проверено ранее)
 
 ### Тесты
@@ -98,6 +106,7 @@ mypy bot.py config.py db/ ai/ services/ handlers/ scheduler.py
 ```bash
 pytest --cov --cov-fail-under=45
 ```
+
 - ✅ 223 passed
 - ✅ Coverage: 54.23% (порог: 45%)
 - ⏱️ Время выполнения: 3.40s
@@ -146,7 +155,7 @@ pytest --cov --cov-fail-under=45
 ## Статистика изменений
 
 | Категория | Действие |
-|-----------|----------|
+| ----------- | ---------- |
 | Мусор | Удалено 20.5 MB кэша и временных файлов |
 | Зависимости | google-genai 2.19.0 → 2.30.0 |
 | Тесты | 223 passed, 0 warnings |
@@ -157,7 +166,7 @@ pytest --cov --cov-fail-under=45
 
 ## Следующие шаги
 
-### Приоритет P3 (Research):
+### Приоритет P3 (Research)
 
 1. **Vercel/Serper API** — исследовать интеграцию для улучшения поиска новостей (Task #20)
 2. **Smoke-тестирование** — разработать систему для проверки основных функций (Task #25)

@@ -1,4 +1,5 @@
 # Implementation Plan (PLAN)
+
 ## SMOKI-bot — План внедрения и развития
 
 **Версия:** 1.0  
@@ -13,7 +14,7 @@
 ### 1.1. Timeline (хронология)
 
 | Дата | Milestone | Статус |
-|------|-----------|--------|
+| ------ | ----------- | -------- |
 | **2024-Q2** | Концепция и прототип | ✅ Complete |
 | **2024-Q3** | MVP (генерация + модерация) | ✅ Complete |
 | **2024-Q4** | Автоцензура + публикация | ✅ Complete |
@@ -31,9 +32,11 @@
 ### 1.2. Ключевые вехи
 
 #### MVP (2024-Q3)
+
 **Цель:** Автоматическая генерация 2 постов/день с модерацией.
 
 **Функции:**
+
 - ✅ Генерация темы + текст (Gemini)
 - ✅ Генерация картинки (Imagen)
 - ✅ Модерация черновиков (5 кнопок)
@@ -45,9 +48,11 @@
 ---
 
 #### Автоцензура (2024-Q4)
+
 **Цель:** Гарантия отсутствия нарушений в публикуемом контенте.
 
 **Функции:**
+
 - ✅ AI-проверка текста перед публикацией
 - ✅ Автоматическая регенерация при нарушении
 - ✅ Накопление правил цензуры
@@ -58,9 +63,11 @@
 ---
 
 #### Модерация комментариев (2025-Q1)
+
 **Цель:** Автоматическая обработка комментариев в группе-обсуждении.
 
 **Функции:**
+
 - ✅ Классификация комментариев (5 классов)
 - ✅ Удаление спама/токсичности
 - ✅ AI-ответы на вопросы
@@ -71,9 +78,11 @@
 ---
 
 #### Serper API Integration (2026-Q3)
+
 **Цель:** Улучшенный поиск новостей с метаданными и картинками.
 
 **Функции:**
+
 - ✅ Hybrid search (Serper для новостей, grounding для остального)
 - ✅ Извлечение imageUrl из новостей
 - ✅ Fallback на Google grounding
@@ -88,7 +97,7 @@
 ### 2.1. Production Metrics
 
 | Метрика | Значение | Статус |
-|---------|----------|--------|
+| --------- | ---------- | -------- |
 | **Uptime** | 99.5% | ✅ Excellent |
 | **Публикации/день** | 2.0 | ✅ Target met |
 | **Время администратора** | 15-30 мин | ✅ Target met |
@@ -102,12 +111,14 @@
 ### 2.2. Known Issues
 
 **ISSUE-001: Длинные новостные посты без imageUrl**  
+
 - Частота: <5% случаев  
 - Workaround: AI-генерация картинки  
 - Приоритет: Low  
 - Статус: Won't fix (редко, не критично)
 
 **ISSUE-002: Saga теряет контекст между эпизодами**  
+
 - Частота: ~10% эпизодов  
 - Workaround: Ручная корректировка `saga_state.recap`  
 - Приоритет: Low  
@@ -120,9 +131,11 @@
 ### 3.1. Q4 2026 (Oct-Dec)
 
 #### P1: A/B тест Serper vs Google grounding
+
 **Цель:** Измерить качество новостей через Serper API vs встроенный grounding.
 
 **Задачи:**
+
 - [ ] Добавить метрику качества в `ai_logs` (rating 1-5)
 - [ ] 2 недели A (только Serper) + 2 недели B (только grounding)
 - [ ] Сравнить: актуальность, источники, качество текста
@@ -134,9 +147,11 @@
 ---
 
 #### P2: Webhook вместо polling
+
 **Цель:** Снизить latency и нагрузку на Telegram API.
 
 **Задачи:**
+
 - [ ] Настроить HTTPS endpoint на сервере (nginx)
 - [ ] Переключить бота с polling на webhook
 - [ ] Тестирование: latency, reliability
@@ -146,15 +161,18 @@
 **Dependencies:** None
 
 **Преимущества:**
+
 - Latency: 0.5-1 сек (вместо 1-3 сек polling)
 - CPU usage: -50% (нет constant polling)
 
 ---
 
 #### P3: Prometheus metrics экспорт
+
 **Цель:** Мониторинг метрик в Grafana.
 
 **Задачи:**
+
 - [ ] Добавить `prometheus_client` библиотеку
 - [ ] Экспорт метрик: requests, latency, errors, AI calls
 - [ ] Endpoint `/metrics` (HTTP)
@@ -166,9 +184,11 @@
 ---
 
 #### P2: Мониторинг использования Serper API
+
 **Цель:** Детальная аналитика использования Serper API для оптимизации расходов.
 
 **Задачи:**
+
 - [ ] Логирование метрик в `ai_logs`: `source=serper`, количество запросов, успешность
 - [ ] Счётчик fallback на grounding (когда Serper не вернул результаты)
 - [ ] Dashboard: Serper usage vs grounding usage (по неделям)
@@ -178,6 +198,7 @@
 **Dependencies:** Serper API integration (✅ complete)
 
 **Метрики:**
+
 - `serper_requests_total` — общее количество запросов к Serper
 - `serper_success_rate` — процент успешных ответов
 - `serper_fallback_rate` — процент fallback на grounding
@@ -186,9 +207,11 @@
 ---
 
 #### P2: Расширение новостных ключевых слов
+
 **Цель:** Улучшить детекцию новостных тем для более точного использования Serper API.
 
 **Задачи:**
+
 - [ ] Расширить `_detect_news_topic()`: добавить ключевые слова
   - Запущ*, выпуск*, представ*, исследован*, отчёт*
   - Стат*, рынок*, тренд*, анонс*, откры*
@@ -204,9 +227,11 @@
 ---
 
 #### P2: Ручное переключение источника поиска
+
 **Цель:** Админ может вручную выбрать Serper/grounding/auto для тестирования.
 
 **Задачи:**
+
 - [ ] Команда `/search_source [serper|grounding|auto]`
   - `serper` — принудительно только Serper (для всех тем)
   - `grounding` — принудительно только Google grounding
@@ -225,9 +250,11 @@
 ### 3.2. Q1 2027 (Jan-Mar)
 
 #### P1: Мультиязычность (английский канал)
+
 **Цель:** Запуск англоязычного канала с тем же ботом.
 
 **Задачи:**
+
 - [ ] Параметризация языка в config (`LANGUAGE=ru|en`)
 - [ ] EN-версии промптов
 - [ ] Отдельный канал: `@SMOKTOLK_EN`
@@ -237,15 +264,18 @@
 **Dependencies:** None
 
 **Риски:**
+
 - Англоязычная аудитория может быть меньше
 - Нужна отдельная модерация комментариев (2 группы)
 
 ---
 
 #### P2: Telegram Mini App (аналитика для админа)
+
 **Цель:** Web-интерфейс для статистики и управления.
 
 **Задачи:**
+
 - [ ] Mini App frontend (React + Telegram WebApp API)
 - [ ] Backend API (FastAPI)
 - [ ] Графики: публикации, комментарии, AI budget
@@ -255,6 +285,7 @@
 **Dependencies:** None
 
 **Преимущества:**
+
 - Удобнее чем кнопки бота
 - Графики и аналитика
 - История публикаций
@@ -262,9 +293,11 @@
 ---
 
 #### P3: Auto-download imageUrl
+
 **Цель:** Скачивать и хранить imageUrl локально (не полагаться на внешние ссылки).
 
 **Задачи:**
+
 - [ ] Функция `download_image(url) -> local_path`
 - [ ] Сохранение в `data/images/news_*.png`
 - [ ] Fallback: если скачать не удалось → AI-генерация
@@ -274,6 +307,7 @@
 **Dependencies:** Serper API integration
 
 **Преимущества:**
+
 - Надёжность: картинка не пропадёт если источник удалит
 - Performance: локальная картинка быстрее
 
@@ -282,9 +316,11 @@
 ### 3.3. Q2 2027 (Apr-Jun)
 
 #### P2: RSS-фид для подписчиков
+
 **Цель:** Альтернативный способ подписки (не только Telegram).
 
 **Задачи:**
+
 - [ ] Генерация RSS XML из БД (`articles` table)
 - [ ] HTTP endpoint `/rss.xml`
 - [ ] Nginx: публичный доступ к `/rss.xml`
@@ -296,9 +332,11 @@
 ---
 
 #### P3: Экспорт статей в blog формат
+
 **Цель:** Автоматическая публикация статей на блог (SEO).
 
 **Задачи:**
+
 - [ ] Интеграция с Ghost/WordPress API
 - [ ] Автоматический экспорт после публикации в канале
 - [ ] Конвертация HTML → Markdown (для Ghost)
@@ -312,17 +350,20 @@
 ### 3.4. Backlog (низкий приоритет)
 
 **Отклонённые идеи:**
+
 - ❌ Ручное редактирование текста через бота (сложно, низкий приоритет)
 - ❌ Интеграция с другими соцсетями (фокус на Telegram)
 - ❌ Платная подписка (не соответствует модели канала)
 
 **Идеи для будущего:**
+
 - 💡 AI-голос для Stories (озвучка текста)
 - 💡 Personalization: разные стили для разных подписчиков
 - 💡 Collaborative features: админы могут комментировать черновики
 - 💡 Analytics API: экспорт метрик для внешних систем
 
 **Новые идеи (на основе анализа GitHub проектов, октябрь 2026):**
+
 - 💡 **Content calendar view** — визуализация запланированных постов на неделю/месяц (Telegram Mini App)
 - 💡 **Template system** — шаблоны для разных типов постов (новость, обзор, факт дня, история)
 - 💡 **User engagement tracking** — метрики: просмотры, реакции, комментарии per post (через Bot API stats)
@@ -341,7 +382,7 @@
 ### 4.1. Code Quality
 
 | Item | Приоритет | Effort | Status |
-|------|-----------|--------|--------|
+| ------ | ----------- | -------- | -------- |
 | **Increase test coverage to 60%** | P1 | 2 недели | 🔄 Planned Q4 2026 |
 | **Refactor scheduler.py (too long)** | P2 | 3 дня | 📋 Backlog |
 | **Type hints coverage 100%** | P2 | 1 неделя | 📋 Backlog |
@@ -353,7 +394,7 @@
 ### 4.2. Infrastructure
 
 | Item | Приоритет | Effort | Status |
-|------|-----------|--------|--------|
+| ------ | ----------- | -------- | -------- |
 | **CI/CD: auto-deploy on merge** | P1 | 1 неделя | 🔄 Planned Q1 2027 |
 | **Docker containerization** | P2 | 3 дня | 📋 Backlog |
 | **PostgreSQL migration** | P3 | 2 недели | 📋 Only if 100x growth |
@@ -364,7 +405,7 @@
 ### 4.3. Documentation
 
 | Item | Приоритет | Effort | Status |
-|------|-----------|--------|--------|
+| ------ | ----------- | -------- | -------- |
 | **API documentation (OpenAPI)** | P2 | 2 дня | 📋 Backlog |
 | **Runbook for incidents** | P1 | 3 дня | 🔄 Planned Q4 2026 |
 | **Architecture diagrams (Mermaid)** | P2 | 1 день | ✅ Done (DESIGN.md) |
@@ -377,7 +418,7 @@
 ### 5.1. External Dependencies
 
 | Dependency | Risk | Mitigation | Status |
-|------------|------|------------|--------|
+| ------------ | ------ | ------------ | -------- |
 | **Telegram Bot API** | Критическая зависимость | Резервный бот-токен | ✅ Stable |
 | **Google Vertex AI** | Высокий риск (стоимость, доступность) | Fallback на AI Studio | ✅ Stable |
 | **Serper News API** | Низкий риск (free tier) | Fallback на grounding | ✅ Stable |
@@ -388,24 +429,28 @@
 ### 5.2. Technical Risks
 
 **RISK-001: SQLite concurrent writes bottleneck**  
+
 - Вероятность: Низкая (только при 100x росте)  
 - Влияние: Высокое (SQLITE_BUSY errors)  
 - Митигация: PostgreSQL migration plan готов  
 - Триггер: >100 записей/сек
 
 **RISK-002: Telegram API rate limits**  
+
 - Вероятность: Средняя (при росте аудитории)  
 - Влияние: Среднее (задержка публикаций)  
 - Митигация: Message queue (Celery)  
 - Триггер: >30 msg/сек в канал
 
 **RISK-003: AI budget overrun**  
+
 - Вероятность: Низкая (текущий расход $1.75/мес)  
 - Влияние: Среднее (нужно увеличить бюджет)  
 - Митигация: Alert при >80% бюджета  
 - Триггер: Unexpected usage spike
 
 **RISK-004: Vertex AI policy changes**  
+
 - Вероятность: Низкая  
 - Влияние: Критическое (нет генерации)  
 - Митигация: Fallback на AI Studio + alternative providers  
@@ -417,7 +462,7 @@
 
 ### 6.1. Development Workflow
 
-```
+```text
 [Feature branch]
        ↓
 [Local testing + unit tests]
@@ -494,6 +539,7 @@ jobs:
 **Когда:** Критическая ошибка в production после деплоя.
 
 **Шаги:**
+
 ```bash
 # 1. SSH на сервер
 gcloud compute ssh telegram-bot
@@ -527,6 +573,7 @@ journalctl -u smoki-bot -n 50
 **Framework:** pytest + pytest-asyncio
 
 **Modules:**
+
 - `tests/test_content.py` — генерация контента
 - `tests/test_censor.py` — автоцензура
 - `tests/test_search.py` — Serper API
@@ -535,6 +582,7 @@ journalctl -u smoki-bot -n 50
 - `tests/test_env_example.py` — валидация config
 
 **Mocking:**
+
 - Все API вызовы мокируются (`MagicMock`, `AsyncMock`)
 - Нет реальных HTTP запросов
 - БД: in-memory SQLite (`:memory:`)
@@ -571,6 +619,7 @@ journalctl -u smoki-bot | grep HEARTBEAT | tail -1
 **Текущая нагрузка:** 2 поста/день + 10-50 комментариев/неделю
 
 **Load test scenario (не запускался):**
+
 - 100 постов/день (50x)
 - 500 комментариев/день (100x)
 - Измерить: latency, errors, resource usage
@@ -584,15 +633,18 @@ journalctl -u smoki-bot | grep HEARTBEAT | tail -1
 ### 8.1. Current Monitoring
 
 **Heartbeat:**
+
 - Частота: каждые 4 часа
 - Проверка: каждый час (systemd timer)
 - Алерт: если нет >8 часов → Telegram alert админу
 
 **Delivery Watchdog:**
+
 - Проверка: PUBLISH_WINDOW_END + 2 часа
 - Алерт: если статьи не доставлены → Telegram alert
 
 **AI Budget:**
+
 - Проверка: команда `/stats`
 - Алерт: если >80% бюджета → предупреждение в `/stats`
 
@@ -601,11 +653,13 @@ journalctl -u smoki-bot | grep HEARTBEAT | tail -1
 ### 8.2. Planned Monitoring (Q4 2026)
 
 **Prometheus + Grafana:**
+
 - Метрики: requests, latency, errors, AI calls, budget
 - Алерты: email/Telegram при критических метриках
 - Дашборд: real-time мониторинг
 
 **Healthcheck endpoint:**
+
 - `/health` (HTTP) — status: ok/degraded/down
 - Проверка: БД доступна, scheduler работает, heartbeat fresh
 
@@ -626,7 +680,7 @@ journalctl -u smoki-bot | grep HEARTBEAT | tail -1
 ### 9.2. Q4 2026 Goals
 
 | Goal | Target | Current | Status |
-|------|--------|---------|--------|
+| ------ | -------- | --------- | -------- |
 | **Test coverage** | 60% | 45% | 🔄 In Progress |
 | **Webhook latency** | <1 сек | 1-3 сек (polling) | 📋 Planned |
 | **Prometheus metrics** | Live | Manual logs | 📋 Planned |
@@ -636,7 +690,7 @@ journalctl -u smoki-bot | grep HEARTBEAT | tail -1
 ### 9.3. Q1 2027 Goals
 
 | Goal | Target | Current | Status |
-|------|--------|---------|--------|
+| ------ | -------- | --------- | -------- |
 | **English channel** | Live | N/A | 📋 Planned |
 | **Mini App** | Live | N/A | 📋 Planned |
 | **CI/CD** | Auto-deploy | Manual | 📋 Planned |
@@ -650,11 +704,13 @@ journalctl -u smoki-bot | grep HEARTBEAT | tail -1
 **Solo Developer:** @shushpanchik_art (owner + developer + admin)
 
 **Roles:**
+
 - Product owner: @shushpanchik_art
 - Developer: @shushpanchik_art
 - Admin (content moderator): @shushpanchik_art
 
 **Time allocation:**
+
 - Development: ~5 часов/неделя (new features)
 - Maintenance: ~2 часа/месяц (monitoring, fixes)
 - Content moderation: 15-30 мин/день (черновики)
@@ -664,7 +720,7 @@ journalctl -u smoki-bot | grep HEARTBEAT | tail -1
 ### 10.2. Infrastructure Costs
 
 | Item | Cost/month | Annual |
-|------|------------|--------|
+| ------ | ------------ | -------- |
 | **GCP e2-micro instance** | $7 | $84 |
 | **AI (Gemini + Imagen)** | $1.75 (avg) | $21 |
 | **Serper API** | $0 (free tier) | $0 |
@@ -680,19 +736,23 @@ journalctl -u smoki-bot | grep HEARTBEAT | tail -1
 ### 11.1. What Went Well
 
 ✅ **Автоцензура спасает от нарушений**  
+
 - 0 нарушений за 2 года работы
 - Автоматическая регенерация работает
 
 ✅ **Hybrid search (Serper API) улучшил новости**  
+
 - Актуальные источники
 - Картинки из новостей
 - Fallback на grounding при ошибках
 
 ✅ **Heartbeat monitoring ловит зависания**  
+
 - 2 случая зависания обнаружены вовремя
 - Админ узнал о проблеме за 30 минут
 
 ✅ **Модерация комментариев экономит время**  
+
 - 100% спама удаляется автоматически
 - AI-ответы на вопросы качественные
 
@@ -701,18 +761,22 @@ journalctl -u smoki-bot | grep HEARTBEAT | tail -1
 ### 11.2. What Could Be Improved
 
 ⚠️ **F-strings в gcloud heredoc — частая ошибка**  
+
 - Решение: документировано в SPEC.md, PROJECT_BOOK
 - Будущее: pre-commit hook для проверки
 
 ⚠️ **Длинные утренние посты (без length_hint)**  
+
 - Решение: всегда передавать `length_hint=prompts.facts_rules(n)`
 - Будущее: unit тест на длину постов
 
 ⚠️ **Saga теряет контекст между эпизодами**  
+
 - Решение: известное ограничение LLM
 - Будущее: RAG (Retrieval-Augmented Generation) для саги
 
 ⚠️ **Manual deploy — медленно и рискованно**  
+
 - Решение: CI/CD (planned Q1 2027)
 
 ---
@@ -720,6 +784,7 @@ journalctl -u smoki-bot | grep HEARTBEAT | tail -1
 ## 12. Документация
 
 **См. также:**
+
 - [PRD.md](PRD.md) — продуктовые требования
 - [TRD.md](TRD.md) — технические требования
 - [FLOW.md](FLOW.md) — пользовательские сценарии

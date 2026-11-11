@@ -72,7 +72,7 @@ STAGED_TGZ="$STAGING_DIR/$ARCHIVE_NAME"
 log "source: $SOURCE_DIR (полный, без исключений)"
 log "target: $RCLONE_REMOTE/$ARCHIVE_NAME (+ $LATEST_NAME via server-side copy)"
 
-cleanup_staging() { rm -f "$STAGED_TGZ" "$STAGED_TGZ.tmp"; }
+cleanup_staging() { rm -f "$STAGED_TGZ" "$STAGED_TGZ.tmp" "$STAGED_TGZ.tar.stderr"; }
 trap cleanup_staging EXIT
 
 SRC_PARENT="$(dirname "$SOURCE_DIR")"
@@ -82,17 +82,19 @@ SRC_NAME="$(basename "$SOURCE_DIR")"
 # --exclude только для собственного staging-каталога бэкапа, чтобы архив
 # не пытался рекурсивно включить сам себя (он в /var/backups, вне SOURCE_DIR,
 # так что фактически исключать нечего — оставлено для явности при ENV-override).
-set +e
+# An if condition suppresses ERR only for this expected-status pipeline.
 # shellcheck disable=SC2086
-tar \
+if tar \
     --warning=no-file-changed \
     --warning=no-file-removed \
     ${TAR_EXTRA_FLAGS:-} \
     -C "$SRC_PARENT" \
     -cf - "$SRC_NAME" 2>"$STAGED_TGZ.tar.stderr" \
-    | gzip -1 > "$STAGED_TGZ.tmp"
-PIPE_RCS=( "${PIPESTATUS[@]}" )
-set -e
+    | gzip -1 > "$STAGED_TGZ.tmp"; then
+    PIPE_RCS=( "${PIPESTATUS[@]}" )
+else
+    PIPE_RCS=( "${PIPESTATUS[@]}" )
+fi
 TAR_RC="${PIPE_RCS[0]:-0}"
 GZIP_RC="${PIPE_RCS[1]:-0}"
 

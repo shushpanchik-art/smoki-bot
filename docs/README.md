@@ -51,9 +51,11 @@
 4. **[DB.md](DB.md)** — разберитесь со схемой БД (15 мин)
 
 Если вы **product manager или stakeholder**:
+
 - Читайте [PRD.md](PRD.md) → [FLOW.md](FLOW.md) → [PLAN.md](PLAN.md)
 
 Если вы **новый админ канала**:
+
 - Читайте [FLOW.md](FLOW.md) — там описан ваш ежедневный workflow
 
 ---
@@ -61,10 +63,12 @@
 ## 📖 Описание документов
 
 ### [PRD.md](PRD.md) — Product Requirements Document
+
 **Размер:** ~275 строк  
 **Для кого:** PM, stakeholders, новые члены команды
 
 **Содержание:**
+
 - Обзор продукта и целевые пользователи
 - 9 ключевых фич (F1-F9) с приоритетами P0-P2
 - Метрики успеха (публикации/день, время админа, uptime)
@@ -75,16 +79,19 @@
 ---
 
 ### [TRD.md](TRD.md) — Technical Requirements Document
+
 **Размер:** ~575 строк  
 **Для кого:** Разработчики, QA, архитекторы
 
 **Содержание:**
+
 - Tech stack: Python 3.11, aiogram 3.x, SQLite, APScheduler, Google Gemini, Serper API
 - 20+ функциональных требований (R-GEN-001 через R-COM-001)
 - NFR: производительность, безопасность, масштабируемость
 - Интеграции: API endpoints, rate limits, error handling
 
 **Ключевые разделы:**
+
 - R-GEN: Генерация контента (hybrid search, autocensor, image generation)
 - R-MOD: Модерация (5-button approval, deadline auto-publish)
 - R-SCH: Расписание (cron, timezone, manual trigger)
@@ -93,10 +100,12 @@
 ---
 
 ### [FLOW.md](FLOW.md) — User Flow Document
+
 **Размер:** ~460 строк  
 **Для кого:** PM, UX designers, новые админы
 
 **Содержание:**
+
 - Ежедневный workflow администратора
 - Утренний пост (08:00-10:00): генерация → модерация → публикация
 - Вечерний пост (19:00-20:30): тот же flow
@@ -107,10 +116,12 @@
 ---
 
 ### [DESIGN.md](DESIGN.md) — System Design Document
+
 **Размер:** ~750 строк  
 **Для кого:** Разработчики, архитекторы, DevOps
 
 **Содержание:**
+
 - High-level архитектура (ASCII diagram)
 - 6 слоёв: Bot Core, Handlers, Services, AI Layer, Database, Scheduler
 - Data flow diagrams: morning post generation, deadline auto-publish, comment moderation
@@ -119,6 +130,7 @@
 - Deployment: GCP Compute Engine, systemd, monitoring (heartbeat)
 
 **Ключевые диаграммы:**
+
 - Morning post generation flow (10 шагов)
 - Deadline auto-publish flow (проверка каждые 5 минут)
 - Comment moderation flow (сбор → классификация → действие)
@@ -126,10 +138,12 @@
 ---
 
 ### [DB.md](DB.md) — Database Design Document
+
 **Размер:** ~650 строк  
 **Для кого:** Разработчики, DBA
 
 **Содержание:**
+
 - 8 таблиц: published_topics, articles, comments, ai_logs, settings, story_jobs, saga_state, saga_summaries
 - Полная схема с описанием каждого поля и constraint
 - Индексы для оптимизации запросов
@@ -138,6 +152,7 @@
 - Backup/recovery: процедуры, расписание, restore
 
 **Ключевые таблицы:**
+
 - `published_topics` — хранит темы для избежания повторов (90 дней)
 - `articles` — черновики и опубликованные статьи (status, deadline, auto_publish)
 - `comments` — модерация комментариев (category: reklama/toxic/question/neutral/positive)
@@ -146,10 +161,12 @@
 ---
 
 ### [PLAN.md](PLAN.md) — Implementation Plan
+
 **Размер:** ~570 строк  
 **Для кого:** Тимлиды, PM, stakeholders
 
 **Содержание:**
+
 - Timeline: 2024-Q2 (концепция) → 2027+ (roadmap)
 - Completed milestones: MVP, Autocensor, Comment moderation, Serper integration
 - Current status (октябрь 2026): production, 2 posts/day, 99.5% uptime
@@ -163,10 +180,12 @@
 ---
 
 ### [SPEC.md](SPEC.md) — Developer Specification ⭐
+
 **Размер:** ~400 строк (было 68KB в версии 1.0)  
 **Для кого:** Разработчики (главный документ для разработки)
 
 **Содержание:**
+
 - **Quick start:** клонирование → setup → запуск за 10 минут
 - **Infrastructure:** GCP project, Compute Engine VM, systemd service
 - **SSH доступ:** для человека и для AI (heredoc patterns, safety)
@@ -177,6 +196,7 @@
 - **Monitoring:** heartbeat, systemd logs, journalctl commands
 
 **Ключевые фичи:**
+
 - Кросс-ссылки на все специализированные документы
 - Минимум дублирования (детали вынесены в PRD/TRD/DESIGN/DB)
 - Практический фокус: как запустить, как дебажить, как деплоить
@@ -184,10 +204,12 @@
 ---
 
 ### [PROJECT_BOOK.md](PROJECT_BOOK.md) — Project Book
+
 **Размер:** ~400 строк  
 **Для кого:** Все (история и контекст)
 
 **Содержание:**
+
 - **История:** от концепции (2024-Q2) до production (2026-Q3)
 - **Выученные уроки:**
   - Автоцензура — must have (0 нарушений за 2 года)
@@ -207,7 +229,7 @@
 
 ## 🔗 Связи между документами
 
-```
+```text
 PRD.md (что) ──┬──> FLOW.md (как видит пользователь)
                ├──> TRD.md (технические требования)
                └──> PLAN.md (roadmap)
@@ -227,6 +249,7 @@ PROJECT_BOOK.md (контекст) ──> все документы (истор
 ## 📝 История версий
 
 ### Версия 2.0 (13 октября 2026)
+
 - Создана новая структура документации (PRD, TRD, FLOW, DESIGN, DB, PLAN, PROJECT_BOOK)
 - SPEC.md рефакторинг: 68KB → 15KB, удалено дублирование
 - Добавлены кросс-ссылки между документами
@@ -234,6 +257,7 @@ PROJECT_BOOK.md (контекст) ──> все документы (истор
 - Создан этот README.md
 
 ### Версия 1.0 (до октября 2026)
+
 - Монолитный SPEC.md (68KB)
 - PROJECT_BOOK.txt (81KB)
 - WORKLOG.md (устаревший)
@@ -243,12 +267,14 @@ PROJECT_BOOK.md (контекст) ──> все документы (истор
 ## 🛠️ Maintenance
 
 **Кто обновляет:**
+
 - **PRD.md, FLOW.md, PLAN.md** — Product Manager
 - **TRD.md, DESIGN.md, DB.md** — Lead Developer
 - **SPEC.md** — любой разработчик (практические гайды)
 - **PROJECT_BOOK.md** — Lead Developer (lessons learned после инцидентов)
 
 **Когда обновляять:**
+
 - **PRD/PLAN** — при изменении roadmap или добавлении фич
 - **TRD** — при добавлении новых требований или интеграций
 - **DESIGN** — при архитектурных изменениях

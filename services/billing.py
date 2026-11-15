@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from datetime import datetime, timezone
 
 import config
@@ -46,6 +47,11 @@ def _sync_fetch() -> dict:
             "reason": "Google ещё не наполнил данные (появятся в течение суток)",
         }
 
+    # Query parameters cannot represent identifiers. Restrict each component
+    # before quoting it, including the table ID returned by the remote API.
+    if not all(re.fullmatch(r"[A-Za-z0-9_-]+", part)
+               for part in (project, dataset, table_id)):
+        return {"available": False, "reason": "некорректный идентификатор таблицы"}
     full_table = f"`{project}.{dataset}.{table_id}`"
 
     # 2) Сумма затрат за текущий календарный месяц (UTC).
@@ -58,7 +64,7 @@ def _sync_fetch() -> dict:
             ANY_VALUE(currency) AS currency
         FROM {full_table}
         WHERE usage_start_time >= @month_start
-    """  # noqa: S608  (идентификаторы из config, значение через параметр)
+    """  # nosec B608
     job_config = bigquery.QueryJobConfig(
         query_parameters=[
             bigquery.ScalarQueryParameter(

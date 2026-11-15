@@ -47,3 +47,17 @@ def test_niche_constants_not_empty():
     assert prompts.NICHE.strip()
     assert prompts.ARTICLE_SYSTEM.strip()
     assert prompts.CENSOR_RULES.strip()
+
+
+def test_image_prompt_hash_is_explicitly_non_security(monkeypatch):
+    original = prompts.hashlib.md5
+    calls = []
+
+    def checked_md5(data, *, usedforsecurity):
+        calls.append(usedforsecurity)
+        return original(data, usedforsecurity=usedforsecurity)
+
+    expected = prompts.image_prompt("hookah")
+    monkeypatch.setattr(prompts.hashlib, "md5", checked_md5)
+    assert prompts.image_prompt("hookah") == expected
+    assert calls == [False]

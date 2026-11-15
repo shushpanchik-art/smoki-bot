@@ -4,9 +4,9 @@ google-genai==2.30.0
 apscheduler==3.11.3
 SQLAlchemy==2.0.52
 python-dotenv==1.2.4
-Pillow==12.3.0
+Pillow==13.0.0
 telethon==1.44.0
 google-cloud-bigquery==3.43.0
-aiohttp==3.11.11
+aiohttp==3.14.4
 feedparser==6.0.11
 tenacity==9.0.0

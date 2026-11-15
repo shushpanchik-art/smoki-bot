@@ -7,6 +7,37 @@ import config
 _SCHEMA_PATH = "/opt/SMOKI/bot/db/schema.sql"
 
 
+# SQL values are bound separately; identifiers must come from these schema lists.
+_UPDATE_COLUMNS = {
+    "articles": frozenset({
+        "id", "topic_id", "body", "image_path", "image_prompt", "status",
+        "admin_feedback", "regen_count", "length_hint", "message_id",
+        "sentiment_score", "created_at", "published_at",
+    }),
+    "comments": frozenset({
+        "id", "chat_id", "message_id", "user_id", "username", "text", "status",
+        "classification", "bot_reply", "created_at", "processed_at",
+    }),
+    "story_jobs": frozenset({
+        "id", "target", "theme", "prompt_en", "image_path", "caption", "status",
+        "feedback", "regen_count", "message_id", "story_msg_id", "created_at",
+        "publish_at",
+    }),
+    "saga_state": frozenset({
+        "episode_number", "arc_number", "arc_goal", "arc_plan_json",
+        "planned_arc_length", "episode_in_arc", "harmon_stage", "characters_json",
+        "locations_json", "last_summary", "prev_message_id", "narration",
+        "pending_arc_seed", "arc_status", "arc_synopsis_json", "updated_at",
+        "last_tail", "prev_first_message_id",
+    }),
+}
+
+
+def _validate_update_fields(table: str, fields: dict) -> None:
+    if not fields.keys() <= _UPDATE_COLUMNS[table]:
+        raise ValueError(f"Unsupported update fields for {table}")
+
+
 async def init_db():
     with open(_SCHEMA_PATH, "r", encoding="utf-8") as f:
         schema = f.read()
@@ -83,10 +114,11 @@ async def get_article(article_id: int) -> dict | None:
 async def update_article(article_id: int, **fields):
     if not fields:
         return
+    _validate_update_fields("articles", fields)
     cols = ", ".join(f"{k} = ?" for k in fields)
     vals = list(fields.values()) + [article_id]
     async with aiosqlite.connect(config.DB_PATH) as db:
-        await db.execute(f"UPDATE articles SET {cols} WHERE id = ?", vals)
+        await db.execute(f"UPDATE articles SET {cols} WHERE id = ?", vals)  # nosec B608
         await db.commit()
 
 
@@ -178,10 +210,11 @@ async def get_new_comments(limit: int = 50) -> list[dict]:
 async def update_comment(comment_id: int, **fields):
     if not fields:
         return
+    _validate_update_fields("comments", fields)
     cols = ", ".join(f"{k} = ?" for k in fields)
     vals = list(fields.values()) + [comment_id]
     async with aiosqlite.connect(config.DB_PATH) as db:
-        await db.execute(f"UPDATE comments SET {cols} WHERE id = ?", vals)
+        await db.execute(f"UPDATE comments SET {cols} WHERE id = ?", vals)  # nosec B608
         await db.commit()
 
 
@@ -246,6 +279,7 @@ async def upsert_saga_state(**fields) -> None:
     """Создаёт (id=1) или обновляет строку состояния саги."""
     if not fields:
         return
+    _validate_update_fields("saga_state", fields)
     async with aiosqlite.connect(config.DB_PATH) as db:
         cur = await db.execute("SELECT 1 FROM saga_state WHERE id = 1")
         exists = await cur.fetchone()
@@ -254,14 +288,14 @@ async def upsert_saga_state(**fields) -> None:
             cols += ", updated_at = datetime('now')"
             vals = list(fields.values()) + [1]
             await db.execute(
-                f"UPDATE saga_state SET {cols} WHERE id = ?", vals)
+                f"UPDATE saga_state SET {cols} WHERE id = ?", vals)  # nosec B608
         else:
             keys = ["id"] + list(fields.keys())
             marks = ", ".join("?" for _ in keys)
             vals = [1] + list(fields.values())
             await db.execute(
                 f"INSERT INTO saga_state ({', '.join(keys)}) "
-                f"VALUES ({marks})", vals)
+                f"VALUES ({marks})", vals)  # nosec B608
         await db.commit()
 
 
@@ -500,11 +534,12 @@ async def get_story_job(job_id: int) -> dict | None:
 async def update_story_job(job_id: int, **fields):
     if not fields:
         return
+    _validate_update_fields("story_jobs", fields)
     cols = ", ".join(f"{k} = ?" for k in fields)
     vals = list(fields.values()) + [job_id]
     async with aiosqlite.connect(config.DB_PATH) as db:
         await db.execute(
-            f"UPDATE story_jobs SET {cols} WHERE id = ?", vals)
+            f"UPDATE story_jobs SET {cols} WHERE id = ?", vals)  # nosec B608
         await db.commit()
 
 

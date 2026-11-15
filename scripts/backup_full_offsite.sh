@@ -122,22 +122,33 @@ rclone "${RCLONE_FLAGS[@]}" copyto "$STAGED_TGZ" "$RCLONE_REMOTE/$ARCHIVE_NAME" 
 UPLOAD_END="$(date +%s)"
 log "uploaded history: $RCLONE_REMOTE/$ARCHIVE_NAME (took $((UPLOAD_END - UPLOAD_START))s)"
 
+# Download and hash bytes, not only backend metadata: some remotes do not
+# expose SHA-256. Never turn a missing/failed checksum into success.
+verify_remote_sha256() {
+    local remote_path="$1" label="$2" hash_output remote_hash
+    if ! hash_output="$(rclone "${RCLONE_FLAGS[@]}" hashsum sha256 "$remote_path" --download)"; then
+        die "integrity FAIL: cannot download/hash $label"
+    fi
+    remote_hash="$(printf '%s\n' "$hash_output" | awk 'NF {count++; hash=$1} END {if (count == 1) print hash}')"
+    if [[ ! "$remote_hash" =~ ^[[:xdigit:]]{64}$ ]]; then
+        die "integrity FAIL: missing or invalid SHA-256 for $label"
+    fi
+    if [ "$remote_hash" != "$TGZ_SHA" ]; then
+        die "integrity FAIL: SHA-256 mismatch for $label"
+    fi
+    log "integrity: downloaded $label SHA-256 matches staged archive"
+}
+
+# Keep the previous latest copy and all history until the new history object
+# has been read back successfully.
+verify_remote_sha256 "$RCLONE_REMOTE/$ARCHIVE_NAME" history
+
 log "server-side copy: $ARCHIVE_NAME -> $LATEST_NAME (без передачи по сети)"
 SS_START="$(date +%s)"
 rclone "${RCLONE_FLAGS[@]}" copyto "$RCLONE_REMOTE/$ARCHIVE_NAME" "$RCLONE_REMOTE/$LATEST_NAME" || die "rclone copyto (latest, server-side) упал"
 SS_END="$(date +%s)"
 log "uploaded latest:  $RCLONE_REMOTE/$LATEST_NAME (server-side, took $((SS_END - SS_START))s)"
-
-REMOTE_HASH="$(rclone "${RCLONE_FLAGS[@]}" hashsum sha256 "$RCLONE_REMOTE/$ARCHIVE_NAME" 2>/dev/null | awk '{print $1}' || true)"
-if [ -n "$REMOTE_HASH" ] && [ "$REMOTE_HASH" != "UNSUPPORTED" ]; then
-    if [ "$REMOTE_HASH" = "$TGZ_SHA" ]; then
-        log "integrity: remote sha256 совпадает с локальным"
-    else
-        die "integrity FAIL: local=$TGZ_SHA remote=$REMOTE_HASH"
-    fi
-else
-    log "integrity: remote hash не предоставлен — сверка пропущена (OK для Я.Диска)"
-fi
+verify_remote_sha256 "$RCLONE_REMOTE/$LATEST_NAME" latest
 
 DELETE_OUTPUT="$(rclone "${RCLONE_FLAGS[@]}" delete --include "$ARCHIVE_GLOB" --min-age "${FULL_RETENTION_DAYS}d" "$RCLONE_REMOTE" 2>&1 || true)"
 log "retention output: ${DELETE_OUTPUT:-(ничего не удалено)}"

@@ -110,8 +110,15 @@ class FullOffsiteBackupTests(unittest.TestCase):
                 shutil.copyfile(resolve(rest[0]), resolve(rest[1]))
             elif operation == 'hashsum':
                 assert rest[0] == 'sha256'
+                assert rest[2:] == ['--download']
+                stage = 'latest' if rest[1].endswith('-latest.tar.gz') else 'history'
+                if os.environ.get('FAKE_HASH_FAIL') == stage:
+                    print('injected hash failure', file=sys.stderr)
+                    sys.exit(7)
+                if os.environ.get('FAKE_EMPTY_HASH') == stage:
+                    sys.exit(0)
                 digest = hashlib.sha256(resolve(rest[1]).read_bytes()).hexdigest()
-                if os.environ.get('FAKE_BAD_HASH'):
+                if os.environ.get('FAKE_BAD_HASH') in ('1', stage):
                     digest = '0' * 64
                 print(digest + '  archive.tar.gz')
             elif operation == 'lsf':
@@ -155,7 +162,7 @@ class FullOffsiteBackupTests(unittest.TestCase):
         self.assertEqual(self.notifications, ["offsite-full-recovered"])
         self.assertEqual(
             [call[0] for call in self.calls],
-            ["copyto", "copyto", "hashsum", "delete", "lsf"],
+            ["copyto", "hashsum", "copyto", "hashsum", "delete", "lsf"],
         )
         history = list(self.remote.glob("smoki-full_*.tar.gz"))
         self.assertEqual(len(history), 1)
@@ -211,7 +218,7 @@ class FullOffsiteBackupTests(unittest.TestCase):
     def test_latest_copy_failure_is_not_reported_as_success(self):
         result = self.run_backup(FAKE_COPY_FAIL="latest")
         self.assert_failure(result)
-        self.assertEqual([call[0] for call in self.calls], ["copyto", "copyto"])
+        self.assertEqual([call[0] for call in self.calls], ["copyto", "hashsum", "copyto"])
         self.assertEqual(len(list(self.remote.glob("smoki-full_*.tar.gz"))), 1)
         self.assertFalse((self.remote / "smoki-full-latest.tar.gz").exists())
 
@@ -219,6 +226,27 @@ class FullOffsiteBackupTests(unittest.TestCase):
         result = self.run_backup(FAKE_BAD_HASH=1)
         self.assert_failure(result)
         self.assertIn("integrity FAIL", result.stdout)
+
+    def test_history_hash_failure_keeps_previous_latest_and_history(self):
+        previous = b"known good previous archive"
+        (self.remote / "smoki-full-latest.tar.gz").write_bytes(previous)
+        result = self.run_backup(FAKE_HASH_FAIL="history")
+        self.assert_failure(result)
+        self.assertEqual([call[0] for call in self.calls], ["copyto", "hashsum"])
+        self.assertEqual((self.remote / "smoki-full-latest.tar.gz").read_bytes(), previous)
+
+    def test_missing_history_checksum_fails_closed(self):
+        self.assert_failure(self.run_backup(FAKE_EMPTY_HASH="history"))
+        self.assertEqual([call[0] for call in self.calls], ["copyto", "hashsum"])
+
+    def test_missing_latest_checksum_fails_closed(self):
+        self.assert_failure(self.run_backup(FAKE_EMPTY_HASH="latest"))
+
+    def test_latest_download_failure_is_not_reported_as_success(self):
+        self.assert_failure(self.run_backup(FAKE_HASH_FAIL="latest"))
+
+    def test_latest_checksum_mismatch_is_not_reported_as_success(self):
+        self.assert_failure(self.run_backup(FAKE_BAD_HASH="latest"))
 
 
 if __name__ == "__main__":

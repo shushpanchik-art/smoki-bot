@@ -117,10 +117,15 @@ class FullOffsiteBackupTests(unittest.TestCase):
                     sys.exit(7)
                 if os.environ.get('FAKE_EMPTY_HASH') == stage:
                     sys.exit(0)
+                if os.environ.get('FAKE_MALFORMED_HASH') == stage:
+                    print('UNSUPPORTED  archive.tar.gz')
+                    sys.exit(0)
                 digest = hashlib.sha256(resolve(rest[1]).read_bytes()).hexdigest()
                 if os.environ.get('FAKE_BAD_HASH') in ('1', stage):
                     digest = '0' * 64
                 print(digest + '  archive.tar.gz')
+                if os.environ.get('FAKE_MULTIPLE_HASHES') == stage:
+                    print(digest + '  another.tar.gz')
             elif operation == 'lsf':
                 for item in sorted(remote.glob('smoki-full_*.tar.gz')):
                     print(item.name)
@@ -230,10 +235,13 @@ class FullOffsiteBackupTests(unittest.TestCase):
     def test_history_hash_failure_keeps_previous_latest_and_history(self):
         previous = b"known good previous archive"
         (self.remote / "smoki-full-latest.tar.gz").write_bytes(previous)
+        old_history = self.remote / "smoki-full_20200101_000000.tar.gz"
+        old_history.write_bytes(previous)
         result = self.run_backup(FAKE_HASH_FAIL="history")
         self.assert_failure(result)
         self.assertEqual([call[0] for call in self.calls], ["copyto", "hashsum"])
         self.assertEqual((self.remote / "smoki-full-latest.tar.gz").read_bytes(), previous)
+        self.assertEqual(old_history.read_bytes(), previous)
 
     def test_missing_history_checksum_fails_closed(self):
         self.assert_failure(self.run_backup(FAKE_EMPTY_HASH="history"))
@@ -247,6 +255,18 @@ class FullOffsiteBackupTests(unittest.TestCase):
 
     def test_latest_checksum_mismatch_is_not_reported_as_success(self):
         self.assert_failure(self.run_backup(FAKE_BAD_HASH="latest"))
+
+    def test_malformed_checksum_is_not_reported_as_success(self):
+        self.assert_failure(self.run_backup(FAKE_MALFORMED_HASH="history"))
+
+    def test_multiple_checksum_lines_are_not_reported_as_success(self):
+        self.assert_failure(self.run_backup(FAKE_MULTIPLE_HASHES="history"))
+
+    def test_history_checksum_mismatch_keeps_previous_latest(self):
+        previous = b"known good previous archive"
+        (self.remote / "smoki-full-latest.tar.gz").write_bytes(previous)
+        self.assert_failure(self.run_backup(FAKE_BAD_HASH="history"))
+        self.assertEqual((self.remote / "smoki-full-latest.tar.gz").read_bytes(), previous)
 
 
 if __name__ == "__main__":

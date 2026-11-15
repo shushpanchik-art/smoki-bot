@@ -129,7 +129,7 @@ def image_prompt(topic: str) -> str:
     """Вариативный промпт: сцена и палитра зависят от темы (детерминированно),
     чтобы разные статьи получали визуально разные картинки.
     """
-    h = int(hashlib.md5(topic.encode("utf-8")).hexdigest(), 16)  # noqa: S324
+    h = int(hashlib.md5(topic.encode("utf-8"), usedforsecurity=False).hexdigest(), 16)
     scene = _IMG_SCENES[h % len(_IMG_SCENES)]
     palette = _IMG_PALETTES[(h // 7) % len(_IMG_PALETTES)]
     return (

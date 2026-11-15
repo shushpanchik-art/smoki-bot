@@ -67,7 +67,6 @@ jobs:
         run: pip install pip-audit
       - name: Audit requirements.txt
         run: pip-audit -r requirements.txt
-        continue-on-error: true
 
   tests:
     name: Pytest

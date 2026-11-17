@@ -762,10 +762,10 @@ async def cb_publish(cq: CallbackQuery, state: FSMContext):
         return
     aid = _cb_arg(cq)
     await cq.answer("Публикую…")
-    await _clear_markup(cq)
     bot = _bot(cq)
     res = await publisher.publish_article(bot, aid)
     if res["ok"]:
+        await _clear_markup(cq)
         await bot.send_message(
             config.ADMIN_CHAT_ID,
             f"✅ Статья #{aid} опубликована (msg {res['message_id']}).",
@@ -785,7 +785,6 @@ async def cb_publish_fb(cq: CallbackQuery, state: FSMContext):
         return
     aid = _cb_arg(cq)
     await cq.answer("Публикую…")
-    await _clear_markup(cq)
     bot = _bot(cq)
     res = await publisher.publish_article(bot, aid)
     if not res["ok"]:
@@ -794,6 +793,7 @@ async def cb_publish_fb(cq: CallbackQuery, state: FSMContext):
             f"❌ Ошибка публикации #{aid}: {res['error']}",
         )
         return
+    await _clear_markup(cq)
     await state.set_state(ModerationStates.waiting_publish_fb)
     await state.update_data(article_id=aid)
     await bot.send_message(

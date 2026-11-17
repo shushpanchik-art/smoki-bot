@@ -23,6 +23,23 @@ CREATE TABLE IF NOT EXISTS articles (
   published_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS article_publication_parts (
+  article_id INTEGER NOT NULL REFERENCES articles(id),
+  position INTEGER NOT NULL CHECK (position > 0),
+  chat_id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  image_path TEXT,
+  state TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'uncertain', 'confirmed')),
+  message_id INTEGER,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (article_id, position),
+  UNIQUE (chat_id, message_id),
+  CHECK (
+    (state = 'confirmed' AND message_id IS NOT NULL AND message_id > 0)
+    OR (state != 'confirmed' AND message_id IS NULL)
+  )
+);
+
 CREATE TABLE IF NOT EXISTS comments (
   id INTEGER PRIMARY KEY,
   chat_id INTEGER,

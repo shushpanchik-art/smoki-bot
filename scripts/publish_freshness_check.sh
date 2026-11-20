@@ -28,7 +28,8 @@ fi
 AGE_H="$(python3 - "$DB" <<'PY'
 import sqlite3, sys
 c = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True)
-row = c.execute("""SELECT (julianday('now','localtime') - julianday(MAX(published_at))) * 24
+# published_at is written as UTC by SQLite datetime('now').
+row = c.execute("""SELECT (julianday('now') - julianday(MAX(published_at))) * 24
                    FROM articles WHERE status = 'published'""").fetchone()
 print("NONE" if row is None or row[0] is None else f"{row[0]:.2f}")
 PY
